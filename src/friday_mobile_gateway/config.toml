@@ -1,0 +1,28 @@
+# Restricted Gateway configuration for Raphael
+# Revision 3.2 FINAL
+
+[server]
+host = "127.0.0.1"
+port = 8765
+
+[auth]
+# Generate a 32-byte cryptographically secure token
+bearer_token = "REPLACE_WITH_SECURE_RANDOM_TOKEN"
+
+[roles.fast]
+provider = "ollama"
+model = "qwen2.5:7b"
+num_ctx = 8192
+num_predict = 512
+thinking = "off"
+
+[roles.deep]
+provider = "ollama"
+model = "deepseek-r1:14b"
+num_ctx = 16384
+num_predict = 1536
+thinking = "provider-managed"
+
+[storage]
+database_path = "data/alexandria.sqlite3"
+undo_window_seconds = 86400

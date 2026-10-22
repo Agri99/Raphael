@@ -1,0 +1,14 @@
+# config.toml for Raphael gateway
+
+[server]
+host = "127.0.0.1"
+port = 8765
+
+[auth]
+# In production store this securely, e.g., Windows ACL‑protected file.
+# Replace with a securely generated 32‑byte base64 token.
+bearer_token = "REPLACE_WITH_SECURE_RANDOM_TOKEN"
+
+[roles]
+fast = { model = "ollama-quick", num_ctx = 8192, output_reserve = 256, thinking = false }
+deep = { model = "ollama-deep", num_ctx = 16384, output_reserve = 512, thinking = true }
