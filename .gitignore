@@ -20,6 +20,8 @@ local.properties
 keystore/
 
 # Python caches and environments
+*.egg-info/
+src/*.egg-info/
 __pycache__/
 *.py[cod]
 *$py.class
