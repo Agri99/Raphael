@@ -30,6 +30,12 @@
 </div>
 
 <script>
+    window.addEventListener('DOMContentLoaded', () => {
+        if (window.location.origin && window.location.origin.startsWith('http')) {
+            document.getElementById('endpoint').value = window.location.origin;
+        }
+    });
+
     const logEl = document.getElementById('log');
     const runBtn = document.getElementById('run');
     const stopBtn = document.getElementById('stop');

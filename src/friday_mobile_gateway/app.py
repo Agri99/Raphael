@@ -4,7 +4,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Request, Depends
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, HTMLResponse
 
 from .config import SETTINGS
 from .auth import authorize_request
@@ -75,6 +75,15 @@ async def get_metrics(token: str = Depends(authorize_request)):
     summary = METRICS.get_summary()
     lines = [f"{k}: {v}" for k, v in summary.items()]
     return PlainTextResponse("\n".join(lines), media_type="text/plain")
+
+
+@app.get("/diagnostic", response_class=HTMLResponse)
+async def diagnostic_page():
+    """Serves the browser diagnostic streaming test page."""
+    test_html_path = Path(__file__).parent.parent.parent / "gateway_test.html"
+    if test_html_path.exists():
+        return HTMLResponse(content=test_html_path.read_text(encoding="utf-8"))
+    return PlainTextResponse("gateway_test.html not found", status_code=404)
 
 
 @app.middleware("http")
