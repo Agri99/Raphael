@@ -41,3 +41,4 @@ def test_info_authenticated_succeeds():
     assert data["api_version"] == "v1"
     assert "fast" in data["modes"]
     assert "deep" in data["modes"]
+

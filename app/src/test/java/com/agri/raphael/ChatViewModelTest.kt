@@ -119,3 +119,4 @@ class FakeMessageDao : MessageDao {
         messages.value = messages.value.filter { it.id != id }
     }
 }
+

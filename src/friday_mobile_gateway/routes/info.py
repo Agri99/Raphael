@@ -19,3 +19,4 @@ async def get_info(token: str = Depends(authorize_request)):
         modes=modes,
         stream_resume_supported=False,
     )
+

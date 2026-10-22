@@ -77,3 +77,4 @@ def load_settings(config_path: Optional[Path] = None) -> GatewaySettings:
 
 
 SETTINGS = load_settings()
+

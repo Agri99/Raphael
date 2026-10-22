@@ -116,3 +116,4 @@ class ContextBuilder:
         accepted_prior.reverse()
 
         return [system_msg] + accepted_prior + [current_user_msg]
+

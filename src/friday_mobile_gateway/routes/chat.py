@@ -116,3 +116,4 @@ async def cancel_chat_generation(
     METRICS.record_request("/v1/chat/cancel")
     cancelled = scheduler.cancel_request(request_id)
     return {"status": "cancelled" if cancelled else "not_found", "request_id": request_id}
+

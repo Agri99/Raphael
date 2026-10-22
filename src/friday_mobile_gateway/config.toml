@@ -26,3 +26,4 @@ thinking = "provider-managed"
 [storage]
 database_path = "data/alexandria.sqlite3"
 undo_window_seconds = 86400
+

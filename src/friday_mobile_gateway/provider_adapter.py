@@ -111,3 +111,4 @@ class OllamaAdapter:
                 raise
             logger.error("Unexpected error in OllamaAdapter: %s", exc)
             raise ProviderError("INTERNAL_ERROR", str(exc)) from exc
+

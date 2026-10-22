@@ -20,3 +20,4 @@ class RoleMap:
     @classmethod
     def is_mode_available(cls, mode: str) -> bool:
         return mode in SETTINGS.roles
+

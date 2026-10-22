@@ -31,3 +31,4 @@ def authorize_request(authorization: str | None = Header(default=None)) -> str:
         raise HTTPException(status_code=401, detail="AUTH_REQUIRED")
 
     return token
+

@@ -59,3 +59,4 @@ class ConcurrencyScheduler:
 
     def release_slot(self) -> None:
         self.semaphore.release()
+

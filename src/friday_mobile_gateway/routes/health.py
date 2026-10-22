@@ -12,3 +12,4 @@ async def health_check():
     """Minimal liveness probe. Discloses no tokens, paths, or model states."""
     METRICS.record_request("/v1/health")
     return HealthResponse(status="ok", api_version="v1")
+

@@ -42,3 +42,4 @@ async def sse_event_stream(
         error_code = getattr(exc, "code", "INTERNAL_ERROR")
         error_msg = getattr(exc, "message", str(exc))
         yield format_sse("error", {"error_code": error_code, "message": error_msg}, event_id=event_id)
+

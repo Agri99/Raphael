@@ -11,3 +11,4 @@ Write-Output "Registering background loopback proxy for Raphael Gateway on port 
 
 Write-Output "Active Tailscale Serve configuration:"
 & tailscale serve status
+
