@@ -42,8 +42,9 @@ Date: 22 October 2026
 - [x] Chat history stays strictly on-device in Room; never uploaded to Alexandria or gateway logs.
 
 ### Testing and CI Hygiene
-- [x] Gateway unit and integration tests passing in pytest (11/11 tests pass).
-- [x] Alexandria module tests passing in pytest (18/18 tests pass).
+- [x] Gateway unit and integration tests passing in pytest (17/17 tests pass).
+- [x] Alexandria module tests passing in pytest (24/24 tests pass).
 - [x] Android unit tests structured in app/src/test/java/com/agri/raphael/.
+- [x] AndroidManifest.xml and valid Gradle wrapper committed.
 - [x] GitHub Actions workflows configured for clean CI checkout.
 - [x] Version control .gitignore configured to exclude runtime databases, WAL files, keystores, and credentials.
