@@ -70,8 +70,16 @@ class OllamaAdapter:
                         except json.JSONDecodeError:
                             continue
 
-                        # Check for done
+                        # Check for done and capture token calibration metadata
                         if chunk.get("done", False):
+                            prompt_eval_count = chunk.get("prompt_eval_count")
+                            eval_count = chunk.get("eval_count")
+                            if prompt_eval_count is not None:
+                                logger.info(
+                                    "Ollama token calibration: prompt_eval_count=%d, eval_count=%s",
+                                    prompt_eval_count,
+                                    eval_count,
+                                )
                             break
 
                         # Extract text delta

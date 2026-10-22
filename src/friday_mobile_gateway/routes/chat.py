@@ -71,6 +71,9 @@ async def start_chat_generation(
 
     # 3. Stream generator wrapped with concurrency release
     async def generation_pipeline():
+        current_task = asyncio.current_task()
+        if current_task:
+            scheduler.register_task(chat_req.request_id, current_task)
         try:
             delta_gen = ollama_adapter.stream_chat(
                 model=role_config.model,

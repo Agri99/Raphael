@@ -54,7 +54,7 @@ fun RaphaelNavHost(navController: NavHostController) {
     }
 
     val chatViewModel = remember {
-        ChatViewModel(repository, inferenceBackend)
+        ChatViewModel(repository, inferenceBackend, preferencesStore)
     }
 
     NavHost(navController = navController, startDestination = "conversations") {

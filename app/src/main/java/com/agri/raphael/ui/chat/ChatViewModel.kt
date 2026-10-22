@@ -8,6 +8,7 @@ import com.agri.raphael.data.local.ConversationEntity
 import com.agri.raphael.data.local.MessageEntity
 import com.agri.raphael.inference.RemoteInferenceBackend
 import com.agri.raphael.inference.StreamEvent
+import com.agri.raphael.settings.PreferencesStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -18,7 +19,8 @@ import java.util.UUID
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModel(
     private val repository: ConversationRepository,
-    private val inferenceBackend: RemoteInferenceBackend
+    private val inferenceBackend: RemoteInferenceBackend,
+    private val preferencesStore: PreferencesStore? = null
 ) : ViewModel() {
 
     private val _currentConversationId = MutableStateFlow<String?>(null)
@@ -35,6 +37,20 @@ class ChatViewModel(
 
     private var activeCall: Call? = null
     private var activeRequestId: String? = null
+    private var activeDraftId: String? = null
+
+    init {
+        // Load default mode preference on startup
+        if (preferencesStore != null) {
+            viewModelScope.launch {
+                preferencesStore.selectedMode.collect { savedMode ->
+                    if (savedMode in listOf("fast", "deep")) {
+                        _mode.value = savedMode
+                    }
+                }
+            }
+        }
+    }
 
     val messages: StateFlow<List<MessageEntity>> = _currentConversationId
         .flatMapLatest { convId ->
@@ -51,11 +67,15 @@ class ChatViewModel(
     fun setMode(newMode: String) {
         if (newMode in listOf("fast", "deep")) {
             _mode.value = newMode
+            preferencesStore?.let {
+                viewModelScope.launch { it.setSelectedMode(newMode) }
+            }
         }
     }
 
     fun toggleMode() {
-        _mode.value = if (_mode.value == "fast") "deep" else "fast"
+        val newMode = if (_mode.value == "fast") "deep" else "fast"
+        setMode(newMode)
     }
 
     fun sendUserMessage(text: String) {
@@ -84,6 +104,7 @@ class ChatViewModel(
         _lastError.value = null
 
         val draftId = UUID.randomUUID().toString()
+        activeDraftId = draftId
         val draftMsg = MessageEntity(
             id = draftId,
             conversationId = convId,
@@ -95,9 +116,11 @@ class ChatViewModel(
         )
         repository.saveMessage(draftMsg)
 
-        // Retrieve bounded recent turns for server prompt assembly
+        // Retrieve clean recent turns for prompt assembly (only completed turns, never failed drafts)
         val recentEntities = repository.getRecentMessages(convId, limit = 10)
-        val messagesPayload = recentEntities.map { it.role to it.content }
+        val messagesPayload = recentEntities
+            .filter { it.status == "complete" }
+            .map { it.role to it.content }
 
         val reqId = UUID.randomUUID().toString()
         activeRequestId = reqId
@@ -129,14 +152,16 @@ class ChatViewModel(
                     is StreamEvent.Meta -> {}
                 }
             },
-            onComplete = { success, error ->
+            onComplete = { success, error, wasDone ->
                 _isGenerating.value = false
                 activeCall = null
                 activeRequestId = null
 
-                val finalStatus = if (success) "complete" else "interrupted"
-                if (!success && error != null && error != "Cancelled") {
-                    _lastError.value = error
+                val finalStatus = if (success && wasDone) "complete" else "interrupted"
+                if (!success || !wasDone) {
+                    if (error != null && error != "Cancelled") {
+                        _lastError.value = error
+                    }
                 }
 
                 viewModelScope.launch(Dispatchers.IO) {
@@ -158,12 +183,30 @@ class ChatViewModel(
         }
         activeCall?.cancel()
         _isGenerating.value = false
+
+        // Mark current draft as interrupted
+        activeDraftId?.let { dId ->
+            viewModelScope.launch(Dispatchers.IO) {
+                val currentMessages = repository.getRecentMessages(_currentConversationId.value ?: "", limit = 5)
+                val target = currentMessages.find { it.id == dId }
+                if (target != null && target.status == "streaming") {
+                    repository.updateMessage(target.copy(status = "interrupted"))
+                }
+            }
+        }
     }
 
     fun retryLast() {
         val convId = _currentConversationId.value ?: return
         if (_isGenerating.value) return
+
         viewModelScope.launch(Dispatchers.IO) {
+            // Remove the last interrupted or failed assistant message if it exists
+            val recent = repository.getRecentMessages(convId, limit = 2)
+            val lastMsg = recent.lastOrNull()
+            if (lastMsg != null && lastMsg.role == "assistant" && lastMsg.status != "complete") {
+                repository.deleteMessage(lastMsg.id)
+            }
             startAssistantGeneration(convId)
         }
     }
@@ -171,12 +214,13 @@ class ChatViewModel(
 
 class ChatViewModelFactory(
     private val repository: ConversationRepository,
-    private val backend: RemoteInferenceBackend
+    private val backend: RemoteInferenceBackend,
+    private val preferencesStore: PreferencesStore? = null
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ChatViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ChatViewModel(repository, backend) as T
+            return ChatViewModel(repository, backend, preferencesStore) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

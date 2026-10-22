@@ -49,9 +49,14 @@ class GatewaySettings(BaseModel):
 
 
 def load_settings(config_path: Optional[Path] = None) -> GatewaySettings:
-    """Loads settings from config.toml with environment variable fallbacks."""
+    """Loads settings from config.local.toml (ignored) or config.toml with environment variable fallbacks."""
+    raw: Dict = {}
+
     if config_path is None:
         candidates = [
+            Path(__file__).parent / "config.local.toml",
+            Path(__file__).parent.parent.parent / "config.local.toml",
+            Path("config.local.toml"),
             Path(__file__).parent / "config.toml",
             Path(__file__).parent.parent.parent / "config.toml",
             Path("config.toml"),
@@ -61,7 +66,6 @@ def load_settings(config_path: Optional[Path] = None) -> GatewaySettings:
                 config_path = c
                 break
 
-    raw: Dict = {}
     if config_path and config_path.exists():
         with open(config_path, "rb") as f:
             raw = tomllib.load(f)
@@ -77,4 +81,3 @@ def load_settings(config_path: Optional[Path] = None) -> GatewaySettings:
 
 
 SETTINGS = load_settings()
-

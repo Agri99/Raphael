@@ -33,7 +33,7 @@ class RemoteInferenceBackend(
         mode: String,
         messages: List<Pair<String, String>>, // role to content
         onEvent: (StreamEvent) -> Unit,
-        onComplete: (Boolean, String?) -> Unit
+        onComplete: (Boolean, String?, Boolean) -> Unit // (success, error, wasDone)
     ): Call {
         val jsonMessages = JSONArray()
         for ((role, content) in messages) {
@@ -62,9 +62,9 @@ class RemoteInferenceBackend(
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 if (call.isCanceled()) {
-                    onComplete(false, "Cancelled")
+                    onComplete(false, "Cancelled", false)
                 } else {
-                    onComplete(false, e.message ?: "Network failure")
+                    onComplete(false, e.message ?: "Network failure", false)
                 }
             }
 
@@ -72,16 +72,19 @@ class RemoteInferenceBackend(
                 response.use { resp ->
                     if (!resp.isSuccessful) {
                         val errBody = resp.body?.string() ?: ""
-                        onComplete(false, "HTTP ${resp.code}: $errBody")
+                        onComplete(false, "HTTP ${resp.code}: $errBody", false)
                         return
                     }
 
                     val source: BufferedSource = resp.body?.source() ?: run {
-                        onComplete(false, "Empty response stream")
+                        onComplete(false, "Empty response stream", false)
                         return
                     }
 
                     var currentEvent = "message"
+                    var receivedDone = false
+                    var receivedError: String? = null
+
                     try {
                         while (!source.exhausted()) {
                             val line = source.readUtf8Line() ?: break
@@ -113,6 +116,7 @@ class RemoteInferenceBackend(
                                             }
                                         }
                                         "done" -> {
+                                            receivedDone = true
                                             onEvent(
                                                 StreamEvent.Done(
                                                     finishReason = dataObj.optString("finish_reason", "stop")
@@ -120,12 +124,10 @@ class RemoteInferenceBackend(
                                             )
                                         }
                                         "error" -> {
-                                            onEvent(
-                                                StreamEvent.Error(
-                                                    errorCode = dataObj.optString("error_code", "INTERNAL_ERROR"),
-                                                    message = dataObj.optString("message", "Stream error")
-                                                )
-                                            )
+                                            val code = dataObj.optString("error_code", "INTERNAL_ERROR")
+                                            val msg = dataObj.optString("message", "Stream error")
+                                            receivedError = "$code: $msg"
+                                            onEvent(StreamEvent.Error(errorCode = code, message = msg))
                                         }
                                     }
                                 } catch (jsonEx: Exception) {
@@ -136,12 +138,19 @@ class RemoteInferenceBackend(
                                 }
                             }
                         }
-                        onComplete(true, null)
+
+                        if (receivedError != null) {
+                            onComplete(false, receivedError, false)
+                        } else if (!receivedDone) {
+                            onComplete(false, "Stream ended unexpectedly before terminal done event.", false)
+                        } else {
+                            onComplete(true, null, true)
+                        }
                     } catch (ex: Exception) {
                         if (call.isCanceled()) {
-                            onComplete(false, "Cancelled")
+                            onComplete(false, "Cancelled", false)
                         } else {
-                            onComplete(false, ex.message)
+                            onComplete(false, ex.message ?: "Stream read failure", false)
                         }
                     }
                 }

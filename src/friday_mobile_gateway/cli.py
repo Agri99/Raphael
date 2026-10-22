@@ -15,24 +15,25 @@ from .config import SETTINGS, load_settings
 
 def rotate_token_cmd(args):
     new_token = generate_secure_token()
-    config_path = Path(__file__).parent / "config.toml"
-    if not config_path.exists():
-        config_path = Path("config.toml")
+    # Write rotated secrets to config.local.toml (excluded by .gitignore)
+    local_config_path = Path(__file__).parent / "config.local.toml"
+    base_config_path = Path(__file__).parent / "config.toml"
 
-    if config_path.exists():
-        with open(config_path, "r", encoding="utf-8") as f:
+    doc = tomlkit.document()
+    if base_config_path.exists():
+        with open(base_config_path, "r", encoding="utf-8") as f:
             doc = tomlkit.load(f)
-        if "auth" not in doc:
-            doc["auth"] = tomlkit.table()
-        doc["auth"]["bearer_token"] = new_token
-        with open(config_path, "w", encoding="utf-8") as f:
-            tomlkit.dump(doc, f)
-        print("Generated new bearer token and updated config.toml.")
-        print("New Bearer Token (record securely in Raphael settings, do not commit):")
-        print(new_token)
-    else:
-        print("config.toml not found. Generated token:")
-        print(new_token)
+
+    if "auth" not in doc:
+        doc["auth"] = tomlkit.table()
+    doc["auth"]["bearer_token"] = new_token
+
+    with open(local_config_path, "w", encoding="utf-8") as f:
+        tomlkit.dump(doc, f)
+
+    print("Generated new bearer token and saved to uncommitted config.local.toml.")
+    print("New Bearer Token (record securely in Raphael Android settings, do not commit):")
+    print(new_token)
 
 
 def status_cmd(args):
@@ -49,7 +50,7 @@ def main():
     parser = argparse.ArgumentParser(description="Raphael Restricted Gateway Operations CLI")
     subparsers = parser.add_subparsers(dest="command")
 
-    subparsers.add_parser("rotate-token", help="Generate and set a new random 32-byte bearer token")
+    subparsers.add_parser("rotate-token", help="Generate and set a new random 32-byte bearer token in config.local.toml")
     subparsers.add_parser("status", help="Print gateway operational configuration and role mapping")
 
     args = parser.parse_args()
@@ -63,4 +64,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

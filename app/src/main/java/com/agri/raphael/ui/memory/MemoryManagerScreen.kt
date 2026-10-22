@@ -24,19 +24,27 @@ fun MemoryManagerScreen(
 
     var memories by remember { mutableStateOf<List<MemoryItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
+    var loadError by remember { mutableStateOf<String?>(null) }
 
     // Dialog states
     var showCreateDialog by remember { mutableStateOf(initialDraftText.isNotEmpty()) }
     var draftText by remember { mutableStateOf(initialDraftText) }
     var draftIsCore by remember { mutableStateOf(false) }
+    var createError by remember { mutableStateOf<String?>(null) }
 
     var editingMemory by remember { mutableStateOf<MemoryItem?>(null) }
-    var lastDeletedMemoryId by remember { mutableStateOf<String?>(null) }
+    var editError by remember { mutableStateOf<String?>(null) }
 
     fun refresh() {
         coroutineScope.launch {
             isLoading = true
-            memories = memoryClient.listMemories()
+            loadError = null
+            val result = memoryClient.listMemories()
+            if (result.isSuccess) {
+                memories = result.getOrDefault(emptyList())
+            } else {
+                loadError = result.exceptionOrNull()?.message ?: "Failed to reach Alexandria."
+            }
             isLoading = false
         }
     }
@@ -67,6 +75,7 @@ fun MemoryManagerScreen(
                 onClick = {
                     draftText = ""
                     draftIsCore = false
+                    createError = null
                     showCreateDialog = true
                 }
             ) {
@@ -74,76 +83,108 @@ fun MemoryManagerScreen(
             }
         }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (isLoading && memories.isEmpty()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (memories.isEmpty()) {
-                Text(
-                    text = "No shared memories stored in Alexandria.",
-                    modifier = Modifier.align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.outline
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+            // Error banner if list fetch failed
+            if (loadError != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(memories, key = { it.id }) { mem ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (mem.isCore) MaterialTheme.colorScheme.tertiaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                if (mem.isCore) {
-                                    Text(
-                                        text = "[Core Profile Fact]",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.tertiary
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                }
-                                Text(
-                                    text = mem.body,
-                                    style = MaterialTheme.typography.bodyMedium
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Connection error: $loadError",
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(onClick = { refresh() }) {
+                            Text("Retry")
+                        }
+                    }
+                }
+            }
+
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                if (isLoading && memories.isEmpty()) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (memories.isEmpty() && loadError == null) {
+                    Text(
+                        text = "No shared memories stored in Alexandria.",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(memories, key = { it.id }) { mem ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (mem.isCore) MaterialTheme.colorScheme.tertiaryContainer
+                                    else MaterialTheme.colorScheme.surfaceVariant
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    TextButton(onClick = { editingMemory = mem }) {
-                                        Text("Edit")
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    if (mem.isCore) {
+                                        Text(
+                                            text = "[Core Profile Fact]",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
                                     }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    TextButton(
-                                        onClick = {
-                                            coroutineScope.launch {
-                                                val success = memoryClient.deleteMemory(mem.id)
-                                                if (success) {
-                                                    lastDeletedMemoryId = mem.id
-                                                    refresh()
-                                                    val res = snackbarHostState.showSnackbar(
-                                                        message = "Memory deleted",
-                                                        actionLabel = "Undo",
-                                                        duration = SnackbarDuration.Short
-                                                    )
-                                                    if (res == SnackbarResult.ActionPerformed) {
-                                                        memoryClient.restoreMemory(mem.id)
+                                    Text(
+                                        text = mem.body,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End
+                                    ) {
+                                        TextButton(onClick = {
+                                            editError = null
+                                            editingMemory = mem
+                                        }) {
+                                            Text("Edit")
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        TextButton(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    val res = memoryClient.deleteMemory(mem.id)
+                                                    if (res.isSuccess) {
                                                         refresh()
+                                                        val snack = snackbarHostState.showSnackbar(
+                                                            message = "Memory deleted",
+                                                            actionLabel = "Undo",
+                                                            duration = SnackbarDuration.Short
+                                                        )
+                                                        if (snack == SnackbarResult.ActionPerformed) {
+                                                            memoryClient.restoreMemory(mem.id)
+                                                            refresh()
+                                                        }
+                                                    } else {
+                                                        snackbarHostState.showSnackbar(
+                                                            message = "Failed to delete: ${res.exceptionOrNull()?.message}"
+                                                        )
                                                     }
                                                 }
                                             }
+                                        ) {
+                                            Text("Delete", color = MaterialTheme.colorScheme.error)
                                         }
-                                    ) {
-                                        Text("Delete", color = MaterialTheme.colorScheme.error)
                                     }
                                 }
                             }
@@ -160,9 +201,20 @@ fun MemoryManagerScreen(
                 title = { Text("Remember This") },
                 text = {
                     Column {
+                        if (createError != null) {
+                            Text(
+                                text = createError ?: "",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
                         OutlinedTextField(
                             value = draftText,
-                            onValueChange = { draftText = it },
+                            onValueChange = {
+                                draftText = it
+                                createError = null
+                            },
                             label = { Text("Memory Fact (max 1500 chars)") },
                             modifier = Modifier.fillMaxWidth(),
                             maxLines = 6
@@ -181,10 +233,14 @@ fun MemoryManagerScreen(
                     Button(
                         onClick = {
                             if (draftText.isNotBlank()) {
-                                showCreateDialog = false
                                 coroutineScope.launch {
-                                    memoryClient.createMemory(draftText.trim(), draftIsCore)
-                                    refresh()
+                                    val res = memoryClient.createMemory(draftText.trim(), draftIsCore)
+                                    if (res.isSuccess) {
+                                        showCreateDialog = false
+                                        refresh()
+                                    } else {
+                                        createError = res.exceptionOrNull()?.message ?: "Failed to save memory."
+                                    }
                                 }
                             }
                         }
@@ -210,9 +266,20 @@ fun MemoryManagerScreen(
                 title = { Text("Edit Stored Memory") },
                 text = {
                     Column {
+                        if (editError != null) {
+                            Text(
+                                text = editError ?: "",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
                         OutlinedTextField(
                             value = editBody,
-                            onValueChange = { editBody = it },
+                            onValueChange = {
+                                editBody = it
+                                editError = null
+                            },
                             label = { Text("Memory Body") },
                             modifier = Modifier.fillMaxWidth(),
                             maxLines = 6
@@ -231,10 +298,14 @@ fun MemoryManagerScreen(
                     Button(
                         onClick = {
                             if (editBody.isNotBlank()) {
-                                editingMemory = null
                                 coroutineScope.launch {
-                                    memoryClient.updateMemory(target.id, editBody.trim(), editCore)
-                                    refresh()
+                                    val res = memoryClient.updateMemory(target.id, editBody.trim(), editCore)
+                                    if (res.isSuccess) {
+                                        editingMemory = null
+                                        refresh()
+                                    } else {
+                                        editError = res.exceptionOrNull()?.message ?: "Failed to update memory."
+                                    }
                                 }
                             }
                         }

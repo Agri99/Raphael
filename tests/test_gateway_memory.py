@@ -99,3 +99,35 @@ def test_memory_edit_delete_restore_lifecycle():
     # Verify back in approved list
     r_list2 = client.get("/v1/memory", headers=AUTH_HEADER)
     assert any(m["id"] == mem_id for m in r_list2.json()["memories"])
+
+
+def test_gateway_memory_duplicate_edit_rejected():
+    fact1 = f"Unique fact one {uuid.uuid4()}."
+    fact2 = f"Unique fact two {uuid.uuid4()}."
+
+    r1 = client.post("/v1/memory", json={"client_request_id": str(uuid.uuid4()), "body": fact1}, headers=AUTH_HEADER)
+    r2 = client.post("/v1/memory", json={"client_request_id": str(uuid.uuid4()), "body": fact2}, headers=AUTH_HEADER)
+    id2 = r2.json()["id"]
+
+    # Try updating memory 2 to have the body of memory 1
+    r_edit = client.patch(f"/v1/memory/{id2}", json={"body": fact1}, headers=AUTH_HEADER)
+    assert r_edit.status_code == 409
+    assert r_edit.json()["detail"]["error_code"] == "DUPLICATE_MEMORY"
+
+
+def test_gateway_memory_duplicate_restore_rejected():
+    shared_fact = f"Fact to be deleted and duplicated {uuid.uuid4()}."
+
+    # Create and delete memory 1
+    r1 = client.post("/v1/memory", json={"client_request_id": str(uuid.uuid4()), "body": shared_fact}, headers=AUTH_HEADER)
+    id1 = r1.json()["id"]
+    client.delete(f"/v1/memory/{id1}", headers=AUTH_HEADER)
+
+    # Create memory 2 with identical fact
+    client.post("/v1/memory", json={"client_request_id": str(uuid.uuid4()), "body": shared_fact}, headers=AUTH_HEADER)
+
+    # Restoring memory 1 should fail with 409
+    r_rest = client.post(f"/v1/memory/{id1}/restore", headers=AUTH_HEADER)
+    assert r_rest.status_code == 409
+    assert r_rest.json()["detail"]["error_code"] == "DUPLICATE_MEMORY"
+

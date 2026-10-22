@@ -19,6 +19,7 @@ from alexandria.lifecycle import (
     RequestIdConflictError,
     MemoryNotFoundError,
     UndoWindowExpiredError,
+    DuplicateMemoryError,
 )
 
 router = APIRouter()
@@ -149,6 +150,12 @@ async def update_memory(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error_code": "MEMORY_NOT_FOUND", "message": str(exc)},
         )
+    except DuplicateMemoryError as exc:
+        METRICS.record_error("DUPLICATE_MEMORY")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error_code": "DUPLICATE_MEMORY", "message": str(exc)},
+        )
 
 
 @router.delete("/memory/{memory_id}")
@@ -195,6 +202,12 @@ async def restore_memory(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error_code": "MEMORY_NOT_FOUND", "message": str(exc)},
+        )
+    except DuplicateMemoryError as exc:
+        METRICS.record_error("DUPLICATE_MEMORY")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error_code": "DUPLICATE_MEMORY", "message": str(exc)},
         )
     except UndoWindowExpiredError as exc:
         METRICS.record_error("INVALID_STATE")

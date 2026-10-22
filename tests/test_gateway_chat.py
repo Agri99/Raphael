@@ -44,6 +44,36 @@ def test_chat_cancellation_endpoint():
     assert r.json()["request_id"] == req_id
 
 
+@pytest.mark.asyncio
+async def test_active_task_cancellation_releases_slot():
+    import asyncio
+    from friday_mobile_gateway.routes.chat import scheduler
+
+    req_id = str(uuid.uuid4())
+    dummy_task = asyncio.create_task(asyncio.sleep(10))
+    scheduler.register_task(req_id, dummy_task)
+
+    # Cancel via endpoint
+    r = client.delete(f"/v1/chat/requests/{req_id}", headers=AUTH_HEADER)
+    assert r.status_code == 200
+    assert r.json()["status"] == "cancelled"
+
+    try:
+        await dummy_task
+    except asyncio.CancelledError:
+        pass
+    assert dummy_task.cancelled()
+
+
+def test_global_body_size_limit_exceeded():
+    # Exceeding 64 KiB global limit at HTTP boundary
+    huge_payload = {"padding": "x" * 70000}
+    r = client.post("/v1/chat", json=huge_payload, headers=AUTH_HEADER)
+    assert r.status_code == 413
+    assert r.json()["detail"]["error_code"] == "INVALID_REQUEST"
+
+
+
 def test_sse_formatting():
     meta = format_sse("meta", {"request_id": "test-1", "api_version": "v1"}, event_id=1)
     assert "id: 1\n" in meta

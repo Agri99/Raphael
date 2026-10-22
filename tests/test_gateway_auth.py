@@ -42,3 +42,16 @@ def test_info_authenticated_succeeds():
     assert "fast" in data["modes"]
     assert "deep" in data["modes"]
 
+
+def test_metrics_unauthenticated_fails():
+    r = client.get("/metrics")
+    assert r.status_code == 401
+    assert r.json()["detail"] == "AUTH_REQUIRED"
+
+
+def test_metrics_authenticated_succeeds():
+    r = client.get("/metrics", headers=AUTH_HEADER)
+    assert r.status_code == 200
+    assert "uptime_seconds:" in r.text
+
+

@@ -1,4 +1,4 @@
-# Settings for the Raphael Android project
+// Settings for the Raphael Android project
 
 rootProject.name = "raphael"
-include ":app"
+include(":app")
