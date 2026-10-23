@@ -123,6 +123,7 @@ class ChatViewModel(
         val recentEntities = repository.getRecentMessages(convId, limit = 10)
         val messagesPayload = recentEntities
             .filter { it.status == "complete" }
+            .sortedBy { it.createdAtEpochMs }
             .map { it.role to it.content }
 
         val reqId = UUID.randomUUID().toString()
