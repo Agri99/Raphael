@@ -18,7 +18,7 @@ class PreferencesStore(private val context: Context) {
     }
 
     val gatewayUrl: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[KEY_GATEWAY_URL] ?: "http://127.0.0.1:8765"
+        prefs[KEY_GATEWAY_URL] ?: "https://invcblpc.tailb75bf1.ts.net"
     }
 
     val selectedMode: Flow<String> = context.dataStore.data.map { prefs ->

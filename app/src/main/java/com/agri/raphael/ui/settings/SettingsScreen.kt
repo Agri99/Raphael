@@ -24,7 +24,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val currentGatewayUrl by preferencesStore.gatewayUrl.collectAsState(initial = "http://127.0.0.1:8765")
+    val currentGatewayUrl by preferencesStore.gatewayUrl.collectAsState(initial = "https://invcblpc.tailb75bf1.ts.net")
     val currentMode by preferencesStore.selectedMode.collectAsState(initial = "fast")
 
     var gatewayUrlInput by remember(currentGatewayUrl) { mutableStateOf(currentGatewayUrl) }
