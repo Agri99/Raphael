@@ -10,6 +10,7 @@ import com.agri.raphael.inference.InferenceBackend
 import com.agri.raphael.inference.RemoteInferenceBackend
 import com.agri.raphael.inference.StreamEvent
 import com.agri.raphael.settings.PreferencesStore
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -21,7 +22,8 @@ import java.util.UUID
 class ChatViewModel(
     private val repository: ConversationRepository,
     private val inferenceBackend: InferenceBackend,
-    private val preferencesStore: PreferencesStore? = null
+    private val preferencesStore: PreferencesStore? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
     private val _currentConversationId = MutableStateFlow<String?>(null)
@@ -94,7 +96,7 @@ class ChatViewModel(
             status = "complete"
         )
 
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             repository.saveMessage(userMsg)
             startAssistantGeneration(convId)
         }
@@ -137,7 +139,7 @@ class ChatViewModel(
                 when (event) {
                     is StreamEvent.Delta -> {
                         accumulatedText.append(event.text)
-                        viewModelScope.launch(Dispatchers.IO) {
+                        viewModelScope.launch(ioDispatcher) {
                             repository.updateMessage(
                                 draftMsg.copy(
                                     content = accumulatedText.toString(),
@@ -165,7 +167,7 @@ class ChatViewModel(
                     }
                 }
 
-                viewModelScope.launch(Dispatchers.IO) {
+                viewModelScope.launch(ioDispatcher) {
                     repository.updateMessage(
                         draftMsg.copy(
                             content = accumulatedText.toString(),
@@ -187,7 +189,7 @@ class ChatViewModel(
 
         // Mark current draft as interrupted
         activeDraftId?.let { dId ->
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 val currentMessages = repository.getRecentMessages(_currentConversationId.value ?: "", limit = 5)
                 val target = currentMessages.find { it.id == dId }
                 if (target != null && target.status == "streaming") {
@@ -201,7 +203,7 @@ class ChatViewModel(
         val convId = _currentConversationId.value ?: return
         if (_isGenerating.value) return
 
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             // Remove the last interrupted or failed assistant message if it exists
             val recent = repository.getRecentMessages(convId, limit = 2)
             val lastMsg = recent.lastOrNull()
@@ -216,12 +218,13 @@ class ChatViewModel(
 class ChatViewModelFactory(
     private val repository: ConversationRepository,
     private val backend: InferenceBackend,
-    private val preferencesStore: PreferencesStore? = null
+    private val preferencesStore: PreferencesStore? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ChatViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ChatViewModel(repository, backend, preferencesStore) as T
+            return ChatViewModel(repository, backend, preferencesStore, ioDispatcher) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

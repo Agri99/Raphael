@@ -42,7 +42,11 @@ class ChatViewModelTest {
         repository = ConversationRepository(fakeConvDao, fakeDao)
 
         fakeBackend = FakeInferenceBackend()
-        viewModel = ChatViewModel(repository, fakeBackend)
+        viewModel = ChatViewModel(
+            repository = repository,
+            inferenceBackend = fakeBackend,
+            ioDispatcher = testDispatcher
+        )
     }
 
     @After
