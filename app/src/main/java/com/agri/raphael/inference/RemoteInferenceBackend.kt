@@ -16,10 +16,23 @@ sealed class StreamEvent {
     data class Error(val errorCode: String, val message: String) : StreamEvent()
 }
 
+interface InferenceBackend {
+    fun streamChat(
+        requestId: String,
+        conversationId: String,
+        mode: String,
+        messages: List<Pair<String, String>>,
+        onEvent: (StreamEvent) -> Unit,
+        onComplete: (Boolean, String?, Boolean) -> Unit
+    ): Call?
+
+    fun cancelRequest(requestId: String)
+}
+
 class RemoteInferenceBackend(
     private val getBaseUrl: () -> String,
     private val getToken: () -> String
-) {
+) : InferenceBackend {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)

@@ -5,7 +5,8 @@ import com.agri.raphael.data.local.ConversationDao
 import com.agri.raphael.data.local.ConversationEntity
 import com.agri.raphael.data.local.MessageDao
 import com.agri.raphael.data.local.MessageEntity
-import com.agri.raphael.inference.RemoteInferenceBackend
+import com.agri.raphael.inference.InferenceBackend
+import com.agri.raphael.inference.StreamEvent
 import com.agri.raphael.ui.chat.ChatViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -16,6 +17,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.Call
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -29,6 +31,7 @@ class ChatViewModelTest {
     private lateinit var fakeDao: FakeMessageDao
     private lateinit var fakeConvDao: FakeConversationDao
     private lateinit var repository: ConversationRepository
+    private lateinit var fakeBackend: FakeInferenceBackend
     private lateinit var viewModel: ChatViewModel
 
     @Before
@@ -38,11 +41,8 @@ class ChatViewModelTest {
         fakeDao = FakeMessageDao()
         repository = ConversationRepository(fakeConvDao, fakeDao)
 
-        val backend = RemoteInferenceBackend(
-            getBaseUrl = { "http://127.0.0.1:8765" },
-            getToken = { "test-token" }
-        )
-        viewModel = ChatViewModel(repository, backend)
+        fakeBackend = FakeInferenceBackend()
+        viewModel = ChatViewModel(repository, fakeBackend)
     }
 
     @After
@@ -118,5 +118,21 @@ class FakeMessageDao : MessageDao {
     override suspend fun deleteMessageById(id: String) {
         messages.value = messages.value.filter { it.id != id }
     }
+}
+
+class FakeInferenceBackend : InferenceBackend {
+    override fun streamChat(
+        requestId: String,
+        conversationId: String,
+        mode: String,
+        messages: List<Pair<String, String>>,
+        onEvent: (StreamEvent) -> Unit,
+        onComplete: (Boolean, String?, Boolean) -> Unit
+    ): Call? {
+        onComplete(true, null, true)
+        return null
+    }
+
+    override fun cancelRequest(requestId: String) {}
 }
 
