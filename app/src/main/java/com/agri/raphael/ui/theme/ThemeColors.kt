@@ -3,6 +3,7 @@ package com.agri.raphael.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun RaphaelTheme(content: @Composable () -> Unit) {
