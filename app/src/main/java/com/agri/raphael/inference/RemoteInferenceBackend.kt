@@ -40,7 +40,7 @@ class RemoteInferenceBackend(
         .retryOnConnectionFailure(true)
         .build()
 
-    fun streamChat(
+    override fun streamChat(
         requestId: String,
         conversationId: String,
         mode: String,
@@ -172,7 +172,7 @@ class RemoteInferenceBackend(
         return call
     }
 
-    fun cancelRequest(requestId: String) {
+    override fun cancelRequest(requestId: String) {
         val url = "${getBaseUrl().trimEnd('/')}/v1/chat/requests/$requestId"
         val request = Request.Builder()
             .url(url)
