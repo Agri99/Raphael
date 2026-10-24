@@ -3,8 +3,8 @@
 Date: 22 October 2026
 Architecture Version: Revision 3.2 FINAL
 Model Settings:
-- Fast Mode: qwen2.5:7b (num_ctx=8192, num_predict=512, thinking=off)
-- Deep Mode: deepseek-r1:14b (num_ctx=16384, num_predict=1536, thinking=provider-managed)
+- Fast Mode: qwen2.5:3b (num_ctx=8192, num_predict=512, thinking=off)
+- Deep Mode: qwen2.5:3b (num_ctx=16384, num_predict=1536, thinking=off)
 Environment: Laptop Local (127.0.0.1:8765) over Tailscale Serve HTTPS
 
 ## Evaluation Methodology

@@ -37,8 +37,8 @@ class GatewaySettings(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
     roles: Dict[str, RoleConfig] = Field(default_factory=lambda: {
-        "fast": RoleConfig(provider="ollama", model="qwen2.5:7b", num_ctx=8192, num_predict=512, thinking="off"),
-        "deep": RoleConfig(provider="ollama", model="deepseek-r1:14b", num_ctx=16384, num_predict=1536, thinking="provider-managed"),
+        "fast": RoleConfig(provider="ollama", model="qwen2.5:3b", num_ctx=8192, num_predict=512, thinking="off"),
+        "deep": RoleConfig(provider="ollama", model="qwen2.5:3b", num_ctx=16384, num_predict=1536, thinking="off"),
     })
     storage: StorageConfig = Field(default_factory=StorageConfig)
     persona_path: str = "config/personas/raphael-v1.md"

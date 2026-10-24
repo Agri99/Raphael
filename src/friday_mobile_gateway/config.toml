@@ -11,17 +11,17 @@ bearer_token = "REPLACE_WITH_SECURE_RANDOM_TOKEN"
 
 [roles.fast]
 provider = "ollama"
-model = "qwen2.5:7b"
+model = "qwen2.5:3b"
 num_ctx = 8192
 num_predict = 512
 thinking = "off"
 
 [roles.deep]
 provider = "ollama"
-model = "deepseek-r1:14b"
+model = "qwen2.5:3b"
 num_ctx = 16384
 num_predict = 1536
-thinking = "provider-managed"
+thinking = "off"
 
 [storage]
 database_path = "data/alexandria.sqlite3"

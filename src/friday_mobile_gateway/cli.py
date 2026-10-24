@@ -46,18 +46,45 @@ def status_cmd(args):
         print(f"  - {role}: model={cfg.model}, num_ctx={cfg.num_ctx}, num_predict={cfg.num_predict}")
 
 
+def restore_db_cmd(args):
+    from alexandria.backup import restore_sqlite_backup
+    backup_file = Path(args.backup_path).resolve()
+    if not backup_file.exists():
+        print(f"Error: Backup file not found at {backup_file}", file=sys.stderr)
+        sys.exit(1)
+
+    db_path = Path(SETTINGS.storage.database_path)
+    if not db_path.is_absolute():
+        db_path = Path(__file__).parent.parent.parent / db_path
+
+    print(f"Initiating offline restore to target: {db_path}")
+    print(f"Source backup: {backup_file}")
+    try:
+        restore_sqlite_backup(backup_file, db_path)
+        print("Offline SQLite database restored successfully.")
+    except RuntimeError as exc:
+        print(f"Restoration halted by offline policy: {exc}", file=sys.stderr)
+        print("Please ensure the gateway process (uvicorn) is stopped before restoring.", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Raphael Restricted Gateway Operations CLI")
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("rotate-token", help="Generate and set a new random 32-byte bearer token in config.local.toml")
     subparsers.add_parser("status", help="Print gateway operational configuration and role mapping")
+    
+    restore_parser = subparsers.add_parser("restore-db", help="Perform verified offline restoration of the SQLite memory database")
+    restore_parser.add_argument("backup_path", help="Path to verified .sqlite3 backup file")
 
     args = parser.parse_args()
     if args.command == "rotate-token":
         rotate_token_cmd(args)
     elif args.command == "status":
         status_cmd(args)
+    elif args.command == "restore-db":
+        restore_db_cmd(args)
     else:
         parser.print_help()
 

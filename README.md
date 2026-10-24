@@ -23,7 +23,7 @@ Xiaomi 12T (Raphael Android App)
 Laptop Gateway (127.0.0.1:8765)
 |-- Bearer token authorization middleware (Constant-time comparison)
 |-- Whole-prompt context budgeting (Persona + Core profile + Memories + Turns)
-|-- Role mapper: "fast" (qwen2.5:7b) and "deep" (deepseek-r1:14b) aliases
+|-- Role mapper: "fast" (qwen2.5:3b) and "deep" (qwen2.5:3b) aliases
 |-- Normalized SSE streaming (meta, delta, done, error)
 |-- Concurrency scheduler (1 active slot, bounded queue, queue timeout)
 \-- Alexandria Provider (In-process SQLite module at data/alexandria.sqlite3)
