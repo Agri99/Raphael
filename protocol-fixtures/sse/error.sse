@@ -1,0 +1,3 @@
+event: error
+data: {"error_code": "MODEL_UNAVAILABLE", "message": "Ollama backend is unreachable."}
+

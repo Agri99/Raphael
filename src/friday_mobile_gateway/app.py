@@ -79,7 +79,9 @@ async def get_metrics(token: str = Depends(authorize_request)):
 
 @app.get("/diagnostic", response_class=HTMLResponse)
 async def diagnostic_page():
-    """Serves the browser diagnostic streaming test page."""
+    """Serves the browser diagnostic streaming test page in development mode only."""
+    if os.getenv("ENVIRONMENT", "development").lower() == "production" and not os.getenv("ENABLE_DIAGNOSTIC"):
+        return PlainTextResponse("Diagnostic page disabled in production.", status_code=403)
     test_html_path = Path(__file__).parent.parent.parent / "gateway_test.html"
     if test_html_path.exists():
         return HTMLResponse(content=test_html_path.read_text(encoding="utf-8"))

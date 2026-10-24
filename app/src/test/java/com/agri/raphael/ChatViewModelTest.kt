@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.setMain
 import okhttp3.Call
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -80,6 +81,105 @@ class ChatViewModelTest {
         val messages = fakeDao.getMessagesForConversation(convId).first()
         assertTrue(messages.any { it.role == "user" && it.content == "Hello Raphael" })
     }
+
+    @Test
+    fun testRetrySelectsAndDeletesOnlyIncompleteAssistantMessage() = runTest {
+        val convId = "conv-retry-test"
+        viewModel.selectConversation(convId)
+
+        // 1. User message (completed, earlier timestamp)
+        val userMsg = MessageEntity(
+            id = "user-1",
+            conversationId = convId,
+            role = "user",
+            content = "Original Question",
+            createdAtEpochMs = 1000L,
+            status = "complete"
+        )
+        fakeDao.insertMessage(userMsg)
+
+        // 2. Interrupted assistant message (incomplete, later timestamp)
+        val interruptedAssistant = MessageEntity(
+            id = "asst-interrupted-1",
+            conversationId = convId,
+            role = "assistant",
+            content = "Partial text before failure...",
+            createdAtEpochMs = 2000L,
+            status = "interrupted"
+        )
+        fakeDao.insertMessage(interruptedAssistant)
+
+        // Verify pre-retry setup
+        val initialRecent = fakeDao.getRecentMessages(convId, limit = 5)
+        assertEquals(2, initialRecent.size)
+        assertEquals("asst-interrupted-1", initialRecent[0].id) // Newest first
+
+        // 3. Trigger Retry
+        viewModel.retryLast()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // 4. Assert user message was preserved and old interrupted draft was deleted
+        val currentMessages = fakeDao.getMessagesForConversation(convId).first()
+        assertTrue("User message must be preserved", currentMessages.any { it.id == "user-1" })
+        assertFalse("Old interrupted assistant draft must be deleted", currentMessages.any { it.id == "asst-interrupted-1" })
+    }
+
+    @Test
+    fun testStopGenerationBindsToOriginatingConversation() = runTest {
+        val convA = "conv-A"
+        val convB = "conv-B"
+
+        viewModel.selectConversation(convA)
+        // Configure backend to keep streaming without completing automatically
+        fakeBackend.autoComplete = false
+
+        viewModel.sendUserMessage("Generate something long")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val msgsA = fakeDao.getMessagesForConversation(convA).first()
+        val streamingDraft = msgsA.find { it.role == "assistant" }
+        assertTrue("Draft must exist in conv-A", streamingDraft != null)
+        assertEquals("streaming", streamingDraft?.status)
+
+        // User navigates to conv-B while generation is active in conv-A
+        viewModel.selectConversation(convB)
+        assertEquals(convB, viewModel.currentConversationId.value)
+
+        // User hits Stop
+        viewModel.stopGeneration()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify draft in conv-A is marked interrupted, and conv-B has no messages
+        val updatedMsgsA = fakeDao.getMessagesForConversation(convA).first()
+        val stoppedDraft = updatedMsgsA.find { it.id == streamingDraft?.id }
+        assertEquals("interrupted", stoppedDraft?.status)
+
+        val msgsB = fakeDao.getMessagesForConversation(convB).first()
+        assertTrue("conv-B must remain empty", msgsB.isEmpty())
+    }
+
+    @Test
+    fun testStreamEventsSerializeInOrderAndComplete() = runTest {
+        val convId = "conv-stream-test"
+        viewModel.selectConversation(convId)
+
+        fakeBackend.autoComplete = false
+        fakeBackend.onStreamChatStarted = { onEvent, onComplete ->
+            onEvent(StreamEvent.Delta("Part 1: Hello. "))
+            onEvent(StreamEvent.Delta("Part 2: Raphael. "))
+            onEvent(StreamEvent.Delta("Part 3: Complete."))
+            onComplete(true, null, true)
+        }
+
+        viewModel.sendUserMessage("Greet me")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val messages = fakeDao.getMessagesForConversation(convId).first()
+        val asstMsg = messages.find { it.role == "assistant" }
+        assertTrue(asstMsg != null)
+        assertEquals("Part 1: Hello. Part 2: Raphael. Part 3: Complete.", asstMsg?.content)
+        assertEquals("complete", asstMsg?.status)
+    }
 }
 
 class FakeConversationDao : ConversationDao {
@@ -117,7 +217,9 @@ class FakeMessageDao : MessageDao {
     override fun getMessagesForConversation(conversationId: String): Flow<List<MessageEntity>> = messages
 
     override suspend fun getRecentMessages(conversationId: String, limit: Int): List<MessageEntity> =
-        messages.value.filter { it.conversationId == conversationId }.takeLast(limit)
+        messages.value.filter { it.conversationId == conversationId }
+            .sortedByDescending { it.createdAtEpochMs }
+            .take(limit)
 
     override suspend fun deleteMessageById(id: String) {
         messages.value = messages.value.filter { it.id != id }
@@ -125,6 +227,9 @@ class FakeMessageDao : MessageDao {
 }
 
 class FakeInferenceBackend : InferenceBackend {
+    var autoComplete = true
+    var onStreamChatStarted: (((StreamEvent) -> Unit, (Boolean, String?, Boolean) -> Unit) -> Unit)? = null
+
     override fun streamChat(
         requestId: String,
         conversationId: String,
@@ -133,10 +238,13 @@ class FakeInferenceBackend : InferenceBackend {
         onEvent: (StreamEvent) -> Unit,
         onComplete: (Boolean, String?, Boolean) -> Unit
     ): Call? {
-        onComplete(true, null, true)
+        if (onStreamChatStarted != null) {
+            onStreamChatStarted?.invoke(onEvent, onComplete)
+        } else if (autoComplete) {
+            onComplete(true, null, true)
+        }
         return null
     }
 
     override fun cancelRequest(requestId: String) {}
 }
-

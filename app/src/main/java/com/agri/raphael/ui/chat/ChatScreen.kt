@@ -46,7 +46,7 @@ fun ChatScreen(
                     FilterChip(
                         selected = mode == "deep",
                         onClick = { viewModel.toggleMode() },
-                        label = { Text(if (mode == "deep") "Think Harder (Deep)" else "Fast") },
+                        label = { Text(if (mode == "deep") "Deep (Extended Budget)" else "Fast") },
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 }

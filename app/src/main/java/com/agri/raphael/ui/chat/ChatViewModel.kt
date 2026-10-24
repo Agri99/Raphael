@@ -11,10 +11,16 @@ import com.agri.raphael.settings.PreferencesStore
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import okhttp3.Call
 import java.util.UUID
+
+private sealed class GenerationEvent {
+    data class Delta(val text: String) : GenerationEvent()
+    data class Terminal(val success: Boolean, val error: String?, val wasDone: Boolean) : GenerationEvent()
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModel(
@@ -39,6 +45,8 @@ class ChatViewModel(
     private var activeCall: Call? = null
     private var activeRequestId: String? = null
     private var activeDraftId: String? = null
+    private var activeConversationId: String? = null
+    private var generationChannel: Channel<GenerationEvent>? = null
 
     init {
         // Load default mode preference on startup
@@ -80,6 +88,7 @@ class ChatViewModel(
     }
 
     fun sendUserMessage(text: String) {
+        if (_isGenerating.value) return
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
         val convId = _currentConversationId.value ?: return
@@ -103,6 +112,7 @@ class ChatViewModel(
     private suspend fun startAssistantGeneration(convId: String) {
         _isGenerating.value = true
         _lastError.value = null
+        activeConversationId = convId
 
         val draftId = UUID.randomUUID().toString()
         activeDraftId = draftId
@@ -117,7 +127,7 @@ class ChatViewModel(
         )
         repository.saveMessage(draftMsg)
 
-        // Retrieve clean recent turns for prompt assembly (only completed turns, never failed drafts)
+        // Retrieve clean recent turns for prompt assembly (only completed turns, never failed/partial drafts)
         val recentEntities = repository.getRecentMessages(convId, limit = 10)
         val messagesPayload = recentEntities
             .filter { it.status == "complete" }
@@ -127,7 +137,51 @@ class ChatViewModel(
         val reqId = UUID.randomUUID().toString()
         activeRequestId = reqId
 
+        val channel = Channel<GenerationEvent>(Channel.UNLIMITED)
+        generationChannel = channel
         val accumulatedText = StringBuilder()
+
+        // Single serialized coroutine writer that processes deltas and terminal transition in order
+        viewModelScope.launch(ioDispatcher) {
+            var isTerminated = false
+            for (event in channel) {
+                when (event) {
+                    is GenerationEvent.Delta -> {
+                        if (!isTerminated) {
+                            accumulatedText.append(event.text)
+                            repository.updateMessage(
+                                draftMsg.copy(
+                                    content = accumulatedText.toString(),
+                                    status = "streaming"
+                                )
+                            )
+                        }
+                    }
+                    is GenerationEvent.Terminal -> {
+                        if (!isTerminated) {
+                            isTerminated = true
+                            val finalStatus = if (event.success && event.wasDone) "complete" else "interrupted"
+                            if (!event.success || !event.wasDone) {
+                                if (event.error != null && event.error != "Cancelled") {
+                                    _lastError.value = event.error
+                                }
+                            }
+                            repository.updateMessage(
+                                draftMsg.copy(
+                                    content = accumulatedText.toString(),
+                                    status = finalStatus
+                                )
+                            )
+                            _isGenerating.value = false
+                            activeCall = null
+                            activeRequestId = null
+                            activeDraftId = null
+                            activeConversationId = null
+                        }
+                    }
+                }
+            }
+        }
 
         activeCall = inferenceBackend.streamChat(
             requestId = reqId,
@@ -137,15 +191,7 @@ class ChatViewModel(
             onEvent = { event ->
                 when (event) {
                     is StreamEvent.Delta -> {
-                        accumulatedText.append(event.text)
-                        viewModelScope.launch(ioDispatcher) {
-                            repository.updateMessage(
-                                draftMsg.copy(
-                                    content = accumulatedText.toString(),
-                                    status = "streaming"
-                                )
-                            )
-                        }
+                        channel.trySend(GenerationEvent.Delta(event.text))
                     }
                     is StreamEvent.Error -> {
                         _lastError.value = "${event.errorCode}: ${event.message}"
@@ -155,47 +201,40 @@ class ChatViewModel(
                 }
             },
             onComplete = { success, error, wasDone ->
-                _isGenerating.value = false
-                activeCall = null
-                activeRequestId = null
-
-                val finalStatus = if (success && wasDone) "complete" else "interrupted"
-                if (!success || !wasDone) {
-                    if (error != null && error != "Cancelled") {
-                        _lastError.value = error
-                    }
-                }
-
-                viewModelScope.launch(ioDispatcher) {
-                    repository.updateMessage(
-                        draftMsg.copy(
-                            content = accumulatedText.toString(),
-                            status = finalStatus
-                        )
-                    )
-                }
+                channel.trySend(GenerationEvent.Terminal(success, error, wasDone))
+                channel.close()
             }
         )
     }
 
     fun stopGeneration() {
         val reqId = activeRequestId
+        val convId = activeConversationId ?: _currentConversationId.value
+        val draftId = activeDraftId
         if (reqId != null) {
             inferenceBackend.cancelRequest(reqId)
         }
         activeCall?.cancel()
-        _isGenerating.value = false
 
-        // Mark current draft as interrupted
-        activeDraftId?.let { dId ->
+        // Terminate channel to flush and write interrupted state bound to originating conversation
+        generationChannel?.trySend(GenerationEvent.Terminal(success = false, error = "Cancelled", wasDone = false))
+        generationChannel?.close()
+        generationChannel = null
+
+        if (convId != null && draftId != null) {
             viewModelScope.launch(ioDispatcher) {
-                val currentMessages = repository.getRecentMessages(_currentConversationId.value ?: "", limit = 5)
-                val target = currentMessages.find { it.id == dId }
+                val currentMessages = repository.getRecentMessages(convId, limit = 10)
+                val target = currentMessages.find { it.id == draftId }
                 if (target != null && target.status == "streaming") {
                     repository.updateMessage(target.copy(status = "interrupted"))
                 }
             }
         }
+        _isGenerating.value = false
+        activeCall = null
+        activeRequestId = null
+        activeDraftId = null
+        activeConversationId = null
     }
 
     fun retryLast() {
@@ -203,11 +242,12 @@ class ChatViewModel(
         if (_isGenerating.value) return
 
         viewModelScope.launch(ioDispatcher) {
-            // Remove the last interrupted or failed assistant message if it exists
-            val recent = repository.getRecentMessages(convId, limit = 2)
-            val lastMsg = recent.lastOrNull()
-            if (lastMsg != null && lastMsg.role == "assistant" && lastMsg.status != "complete") {
-                repository.deleteMessage(lastMsg.id)
+            // Retrieve recent messages for this conversation (ordered newest first)
+            val recent = repository.getRecentMessages(convId, limit = 5)
+            // Explicitly find the latest incomplete assistant message draft
+            val targetIncomplete = recent.firstOrNull { it.role == "assistant" && it.status != "complete" }
+            if (targetIncomplete != null) {
+                repository.deleteMessage(targetIncomplete.id)
             }
             startAssistantGeneration(convId)
         }

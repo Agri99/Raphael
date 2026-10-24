@@ -9,7 +9,7 @@ from ..schemas import ChatRequest
 from ..role_map import RoleMap
 from ..context_builder import ContextBuilder
 from ..provider_adapter import OllamaAdapter, ProviderError
-from ..streaming import sse_event_stream
+from ..streaming import sse_event_stream, format_sse
 from ..scheduler import ConcurrencyScheduler, SchedulerBusyError
 from ..observability import METRICS, logger
 
@@ -90,11 +90,11 @@ async def start_chat_generation(
             raise
         except ProviderError as pe:
             METRICS.record_error(pe.code)
-            yield f"event: error\ndata: {{\"error_code\":\"{pe.code}\",\"message\":\"{pe.message}\"}}\n\n"
+            yield format_sse("error", {"error_code": pe.code, "message": pe.message})
         except Exception as exc:
             METRICS.record_error("INTERNAL_ERROR")
             logger.error("Error in stream pipeline: %s", exc)
-            yield f"event: error\ndata: {{\"error_code\":\"INTERNAL_ERROR\",\"message\":\"Stream failure\"}}\n\n"
+            yield format_sse("error", {"error_code": "INTERNAL_ERROR", "message": "Stream failure"})
         finally:
             scheduler.release_slot()
             scheduler.unregister_task(chat_req.request_id)
