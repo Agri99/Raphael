@@ -89,3 +89,96 @@ def test_sse_formatting():
     assert "id: 3\n" in done
     assert "event: done\n" in done
     assert '"finish_reason": "stop"' in done
+
+
+@pytest.mark.asyncio
+async def test_real_e2e_streaming_cancellation_and_slot_release():
+    """
+    Proves real cancellation end-to-end:
+    1. Starts a generation that stays active long enough to cancel.
+    2. Confirms response begins streaming and client consumes events.
+    3. Calls cancellation endpoint using request ID.
+    4. Confirms generation stops and scheduler slot is released.
+    5. Confirms subsequent request succeeds.
+    """
+    import asyncio
+    from httpx import AsyncClient, ASGITransport
+    from friday_mobile_gateway.routes.chat import ollama_adapter, scheduler
+
+    req_id = f"cancel-e2e-{uuid.uuid4()}"
+    started_streaming = asyncio.Event()
+    hang_active_generation = asyncio.Event()
+
+    async def mock_active_stream(*args, **kwargs):
+        yield "Initial chunk of streamed text. "
+        started_streaming.set()
+        # Stay suspended until cancelled
+        await hang_active_generation.wait()
+        yield "This text should never be reached"
+
+    original_stream_chat = ollama_adapter.stream_chat
+    ollama_adapter.stream_chat = mock_active_stream
+
+    transport = ASGITransport(app=app)
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            payload = {
+                "request_id": req_id,
+                "conversation_id": "test-conv-e2e",
+                "mode": "fast",
+                "messages": [{"role": "user", "content": "Generate a detailed story"}],
+            }
+
+            received_chunks = []
+
+            async def consume_stream():
+                try:
+                    async with ac.stream("POST", "/v1/chat", json=payload, headers=AUTH_HEADER) as resp:
+                        assert resp.status_code == 200
+                        async for line in resp.aiter_lines():
+                            if line.startswith("data: "):
+                                received_chunks.append(line)
+                except Exception:
+                    pass
+
+            stream_task = asyncio.create_task(consume_stream())
+
+            # 2. Wait until generation starts and yields first token
+            await asyncio.wait_for(started_streaming.wait(), timeout=3.0)
+
+            # Confirm task is actively registered in scheduler
+            assert req_id in scheduler._active_tasks
+
+            # 3. Call cancellation endpoint
+            cancel_resp = await ac.delete(f"/v1/chat/requests/{req_id}", headers=AUTH_HEADER)
+            assert cancel_resp.status_code == 200
+            assert cancel_resp.json()["status"] == "cancelled"
+
+            # 4. Confirm generation stopped and slot released
+            await asyncio.wait_for(stream_task, timeout=3.0)
+            assert req_id not in scheduler._active_tasks
+            assert scheduler.semaphore._value == 1
+
+            # 5. Subsequent request succeeds
+            async def quick_stream(*args, **kwargs):
+                yield "Subsequent prompt answered successfully."
+
+            ollama_adapter.stream_chat = quick_stream
+
+            subsequent_req_id = f"subsequent-{uuid.uuid4()}"
+            sub_payload = {
+                "request_id": subsequent_req_id,
+                "conversation_id": "test-conv-e2e",
+                "mode": "fast",
+                "messages": [{"role": "user", "content": "What is the capital of Indonesia?"}],
+            }
+
+            async with ac.stream("POST", "/v1/chat", json=sub_payload, headers=AUTH_HEADER) as sub_resp:
+                assert sub_resp.status_code == 200
+                lines = [l async for l in sub_resp.aiter_lines() if l.startswith("data: ")]
+                assert any("Subsequent prompt answered successfully." in l for l in lines)
+                assert any('"finish_reason": "stop"' in l for l in lines)
+
+    finally:
+        ollama_adapter.stream_chat = original_stream_chat
+

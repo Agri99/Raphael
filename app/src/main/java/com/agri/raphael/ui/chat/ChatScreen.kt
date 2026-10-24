@@ -95,7 +95,10 @@ fun ChatScreen(
                 items(messages, key = { it.id }) { msg ->
                     MessageBubble(
                         message = msg,
-                        onRememberThis = { onSaveMemoryRequest(msg.content) }
+                        onRememberThis = { onSaveMemoryRequest(msg.content) },
+                        onRetry = if (msg.status == "interrupted" && msg.role == "assistant") {
+                            { viewModel.retryLast() }
+                        } else null
                     )
                 }
             }
@@ -152,7 +155,8 @@ fun ChatScreen(
 @Composable
 fun MessageBubble(
     message: MessageEntity,
-    onRememberThis: () -> Unit
+    onRememberThis: () -> Unit,
+    onRetry: (() -> Unit)? = null
 ) {
     val isUser = message.role == "user"
     var expandedMenu by remember { mutableStateOf(false) }
@@ -177,18 +181,41 @@ fun MessageBubble(
                 )
 
                 if (message.status == "interrupted") {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "[Interrupted]",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "[Interrupted]",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        if (onRetry != null) {
+                            FilledTonalButton(
+                                onClick = onRetry,
+                                modifier = Modifier.height(28.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text("Retry", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
                 }
 
                 DropdownMenu(
                     expanded = expandedMenu,
                     onDismissRequest = { expandedMenu = false }
                 ) {
+                    if (onRetry != null) {
+                        DropdownMenuItem(
+                            text = { Text("Retry response") },
+                            onClick = {
+                                expandedMenu = false
+                                onRetry()
+                            }
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("Remember this") },
                         onClick = {

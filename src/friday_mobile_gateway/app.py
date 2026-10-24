@@ -86,25 +86,68 @@ async def diagnostic_page():
     return PlainTextResponse("gateway_test.html not found", status_code=404)
 
 
-@app.middleware("http")
-async def limit_body_size(request: Request, call_next):
-    """Enforces maximum HTTP body size limit at gateway boundary."""
-    content_length = request.headers.get("content-length")
-    if content_length and int(content_length) > SETTINGS.max_request_body_bytes:
-        return JSONResponse(
-            status_code=413,
-            content={"detail": {"error_code": "INVALID_REQUEST", "message": "Request body exceeds maximum allowed size."}},
-        )
+class LimitBodySizeMiddleware:
+    """Enforces maximum HTTP body size limit at gateway boundary without buffering streaming responses."""
 
-    # In case content-length header was omitted, check actual body size
-    body = await request.body()
-    if len(body) > SETTINGS.max_request_body_bytes:
-        return JSONResponse(
-            status_code=413,
-            content={"detail": {"error_code": "INVALID_REQUEST", "message": "Request body exceeds maximum allowed size."}},
-        )
+    def __init__(self, app, max_bytes: int):
+        self.app = app
+        self.max_bytes = max_bytes
 
-    return await call_next(request)
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        cl_header = headers.get(b"content-length")
+        if cl_header:
+            try:
+                cl = int(cl_header.decode("latin1"))
+                if cl < 0:
+                    response = JSONResponse(
+                        status_code=400,
+                        content={"detail": {"error_code": "INVALID_REQUEST", "message": "Invalid negative Content-Length header."}},
+                    )
+                    await response(scope, receive, send)
+                    return
+                if cl > self.max_bytes:
+                    response = JSONResponse(
+                        status_code=413,
+                        content={"detail": {"error_code": "INVALID_REQUEST", "message": "Request body exceeds maximum allowed size."}},
+                    )
+                    await response(scope, receive, send)
+                    return
+            except ValueError:
+                response = JSONResponse(
+                    status_code=400,
+                    content={"detail": {"error_code": "INVALID_REQUEST", "message": "Malformed Content-Length header."}},
+                )
+                await response(scope, receive, send)
+                return
+
+        received_bytes = 0
+        response_sent = False
+
+        async def limited_receive():
+            nonlocal received_bytes, response_sent
+            message = await receive()
+            if message["type"] == "http.request":
+                body = message.get("body", b"")
+                received_bytes += len(body)
+                if received_bytes > self.max_bytes and not response_sent:
+                    response_sent = True
+                    response = JSONResponse(
+                        status_code=413,
+                        content={"detail": {"error_code": "INVALID_REQUEST", "message": "Request body exceeds maximum allowed size."}},
+                    )
+                    await response(scope, receive, send)
+                    return {"type": "http.disconnect"}
+            return message
+
+        await self.app(scope, limited_receive, send)
+
+
+app.add_middleware(LimitBodySizeMiddleware, max_bytes=SETTINGS.max_request_body_bytes)
 
 
 if __name__ == "__main__":
