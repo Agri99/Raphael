@@ -67,6 +67,12 @@ To inspect configuration status:
 python -m friday_mobile_gateway.cli status
 ```
 
+To restore the SQLite shared memory database from a verified backup (offline):
+
+```bash
+python -m friday_mobile_gateway.cli restore-db path/to/backup.sqlite3
+```
+
 ### 3. Launching the Gateway and Tailscale Serve
 
 Start the gateway process bound to loopback:

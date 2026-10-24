@@ -1,7 +1,7 @@
 """Chat generation and cancellation routes."""
 
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from ..auth import authorize_request
@@ -31,7 +31,6 @@ def configure_chat_dependencies(sched: ConcurrencyScheduler, adapter: OllamaAdap
 @router.post("/chat")
 async def start_chat_generation(
     chat_req: ChatRequest,
-    raw_request: Request,
     token: str = Depends(authorize_request),
 ):
     METRICS.record_request("/v1/chat")

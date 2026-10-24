@@ -1,14 +1,11 @@
 """Ollama provider adapter for laptop-local inference."""
 
 import json
-import re
-from typing import AsyncGenerator, Dict, Any, List, Optional
+from typing import AsyncGenerator, Dict, Any, List
 import httpx
 import logging
 
 logger = logging.getLogger(__name__)
-
-THINK_REGEX = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 
 
 class ProviderError(Exception):

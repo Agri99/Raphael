@@ -4,10 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.agri.raphael.data.ConversationRepository
-import com.agri.raphael.data.local.ConversationEntity
 import com.agri.raphael.data.local.MessageEntity
 import com.agri.raphael.inference.InferenceBackend
-import com.agri.raphael.inference.RemoteInferenceBackend
 import com.agri.raphael.inference.StreamEvent
 import com.agri.raphael.settings.PreferencesStore
 import kotlinx.coroutines.CoroutineDispatcher

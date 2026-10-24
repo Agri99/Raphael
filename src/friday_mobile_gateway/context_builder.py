@@ -1,7 +1,8 @@
 """Context assembly, prompt budgeting, and turn trimming."""
 
+import math
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 import logging
 
 from .config import SETTINGS
@@ -48,7 +49,6 @@ def estimate_tokens(text: str) -> int:
     """
     if not text:
         return 0
-    import math
     return max(1, math.ceil(len(text) / 3.0))
 
 

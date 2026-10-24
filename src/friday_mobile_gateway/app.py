@@ -3,7 +3,7 @@
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Depends
 from fastapi.responses import JSONResponse, PlainTextResponse, HTMLResponse
 
 from .config import SETTINGS

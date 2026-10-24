@@ -1,8 +1,7 @@
 """Memory API routes delegating directly to in-process Alexandria MemoryProvider."""
 
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
 
 from ..auth import authorize_request
 from ..schemas import (
@@ -11,9 +10,9 @@ from ..schemas import (
     MemoryRecordResponse,
     MemoryListResponse,
 )
-from ..observability import METRICS, logger
+from ..observability import METRICS
 from alexandria.provider import MemoryProvider
-from alexandria.models import MemoryDraft
+from alexandria.models import MemoryDraft, MemoryRecord
 from alexandria.lifecycle import (
     InvalidMemoryError,
     RequestIdConflictError,
@@ -26,6 +25,20 @@ router = APIRouter()
 
 # Global provider instance configured during app lifespan
 memory_provider: Optional[MemoryProvider] = None
+
+
+def _to_response(record: MemoryRecord) -> MemoryRecordResponse:
+    """Converts a domain MemoryRecord into an API response schema."""
+    return MemoryRecordResponse(
+        id=record.id,
+        body=record.body,
+        is_core=record.is_core,
+        status=record.status,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        deleted_at=record.deleted_at,
+        client_request_id=record.client_request_id,
+    )
 
 
 def configure_memory_provider(provider: MemoryProvider) -> None:
@@ -59,21 +72,7 @@ async def list_memories(
     METRICS.record_request("/v1/memory")
     provider = _get_provider()
     records = provider.list_approved(limit=limit)
-    return MemoryListResponse(
-        memories=[
-            MemoryRecordResponse(
-                id=r.id,
-                body=r.body,
-                is_core=r.is_core,
-                status=r.status,
-                created_at=r.created_at,
-                updated_at=r.updated_at,
-                deleted_at=r.deleted_at,
-                client_request_id=r.client_request_id,
-            )
-            for r in records
-        ]
-    )
+    return MemoryListResponse(memories=[_to_response(r) for r in records])
 
 
 @router.post("/memory", response_model=MemoryRecordResponse)
@@ -91,16 +90,7 @@ async def create_memory(
 
     try:
         record = provider.create_explicit(draft, request_id=req.client_request_id)
-        return MemoryRecordResponse(
-            id=record.id,
-            body=record.body,
-            is_core=record.is_core,
-            status=record.status,
-            created_at=record.created_at,
-            updated_at=record.updated_at,
-            deleted_at=record.deleted_at,
-            client_request_id=record.client_request_id,
-        )
+        return _to_response(record)
     except InvalidMemoryError as exc:
         METRICS.record_error("INVALID_MEMORY")
         raise HTTPException(
@@ -128,16 +118,7 @@ async def update_memory(
 
     try:
         record = provider.update_explicit(memory_id, draft)
-        return MemoryRecordResponse(
-            id=record.id,
-            body=record.body,
-            is_core=record.is_core,
-            status=record.status,
-            created_at=record.created_at,
-            updated_at=record.updated_at,
-            deleted_at=record.deleted_at,
-            client_request_id=record.client_request_id,
-        )
+        return _to_response(record)
     except InvalidMemoryError as exc:
         METRICS.record_error("INVALID_MEMORY")
         raise HTTPException(
@@ -187,16 +168,7 @@ async def restore_memory(
     provider = _get_provider()
     try:
         record = provider.restore_recent_delete(memory_id)
-        return MemoryRecordResponse(
-            id=record.id,
-            body=record.body,
-            is_core=record.is_core,
-            status=record.status,
-            created_at=record.created_at,
-            updated_at=record.updated_at,
-            deleted_at=record.deleted_at,
-            client_request_id=record.client_request_id,
-        )
+        return _to_response(record)
     except MemoryNotFoundError as exc:
         METRICS.record_error("MEMORY_NOT_FOUND")
         raise HTTPException(

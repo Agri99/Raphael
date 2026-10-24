@@ -1,6 +1,5 @@
 """Model role alias resolver and validation."""
 
-from typing import Dict
 from .config import SETTINGS, RoleConfig
 
 

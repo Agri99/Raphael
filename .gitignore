@@ -46,7 +46,6 @@ env/
 !.env.example
 config.local.toml
 src/friday_mobile_gateway/config.local.toml
-src/raphael_gateway/config.local.toml
 
 # OS and IDE metadata
 .DS_Store

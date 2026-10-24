@@ -1,7 +1,7 @@
 """Concurrency scheduler and request cancellation manager."""
 
 import asyncio
-from typing import Dict, Optional
+from typing import Dict
 import logging
 
 logger = logging.getLogger(__name__)

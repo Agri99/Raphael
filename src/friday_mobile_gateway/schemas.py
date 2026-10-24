@@ -1,7 +1,7 @@
 """Pydantic schemas and standard error codes for restricted gateway."""
 
 from typing import List, Literal, Optional
-from pydantic import BaseModel, Field, constr
+from pydantic import BaseModel, Field
 
 
 class MessageItem(BaseModel):
