@@ -1,5 +1,5 @@
 # Tailscale Serve PowerShell Launcher for Raphael Gateway
-# Revision 3.2 FINAL
+# Revision 3.4 (Lean Production Readiness)
 
 $ErrorActionPreference = "Stop"
 

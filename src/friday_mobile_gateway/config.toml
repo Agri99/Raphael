@@ -1,5 +1,5 @@
 # Restricted Gateway configuration for Raphael
-# Revision 3.2 FINAL
+# Revision 3.4 (Lean Production Readiness)
 
 [server]
 host = "127.0.0.1"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tailscale Serve launch script for Raphael Gateway
-# Revision 3.2 FINAL
+# Revision 3.4 (Lean Production Readiness)
 
 set -euo pipefail
 

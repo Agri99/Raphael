@@ -251,6 +251,97 @@ class ChatViewModelTest {
         assertEquals("Accumulated Part 1. Accumulated Part 2.", asstDraft?.content)
         assertEquals("interrupted", asstDraft?.status)
     }
+
+    @Test
+    fun testRapidRepeatedRetryIgnored() = runTest {
+        val convId = "conv-rapid-retry"
+        viewModel.selectConversation(convId)
+
+        fakeDao.insertMessage(MessageEntity("u-1", convId, "user", "Prompt 1", 1000L, "complete"))
+        fakeDao.insertMessage(MessageEntity("a-1", convId, "assistant", "Incomplete", 2000L, "interrupted"))
+
+        fakeBackend.autoComplete = false
+
+        // Two rapid calls to retryLast before advancing dispatcher
+        viewModel.retryLast()
+        viewModel.retryLast()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val messages = fakeDao.getMessagesForConversation(convId).first()
+        val assistantDrafts = messages.filter { it.role == "assistant" }
+        // Only one new generation draft should have been created (old a-1 was deleted)
+        assertEquals(1, assistantDrafts.size)
+        assertEquals("streaming", assistantDrafts[0].status)
+    }
+
+    @Test
+    fun testStopVersusDoneTerminalRace() = runTest {
+        val convId = "conv-stop-vs-done"
+        viewModel.selectConversation(convId)
+
+        fakeBackend.autoComplete = false
+        var emitDelta: ((StreamEvent) -> Unit)? = null
+        var emitComplete: ((Boolean, String?, Boolean) -> Unit)? = null
+
+        fakeBackend.onStreamChatStarted = { onEvent, onComplete ->
+            emitDelta = onEvent
+            emitComplete = onComplete
+        }
+
+        viewModel.sendUserMessage("Streaming prompt")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        emitDelta?.invoke(StreamEvent.Delta("Partial content before user stop."))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // User calls stop
+        viewModel.stopGeneration()
+
+        // Late 'done' arrival from network pipeline
+        emitComplete?.invoke(true, null, true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val messages = fakeDao.getMessagesForConversation(convId).first()
+        val asstMsg = messages.find { it.role == "assistant" }
+        assertTrue(asstMsg != null)
+        // Late 'done' MUST NOT overwrite 'interrupted'
+        assertEquals("interrupted", asstMsg?.status)
+        assertEquals("Partial content before user stop.", asstMsg?.content)
+    }
+
+    @Test
+    fun testStopVersusNetworkFailureRace() = runTest {
+        val convId = "conv-stop-vs-net-fail"
+        viewModel.selectConversation(convId)
+
+        fakeBackend.autoComplete = false
+        var emitDelta: ((StreamEvent) -> Unit)? = null
+        var emitComplete: ((Boolean, String?, Boolean) -> Unit)? = null
+
+        fakeBackend.onStreamChatStarted = { onEvent, onComplete ->
+            emitDelta = onEvent
+            emitComplete = onComplete
+        }
+
+        viewModel.sendUserMessage("Prompt testing failure race")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        emitDelta?.invoke(StreamEvent.Delta("Content before disconnect."))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // User triggers stop
+        viewModel.stopGeneration()
+
+        // Socket/network failure arrives afterwards
+        emitComplete?.invoke(false, "Socket closed", false)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val messages = fakeDao.getMessagesForConversation(convId).first()
+        val asstMsg = messages.find { it.role == "assistant" }
+        assertTrue(asstMsg != null)
+        assertEquals("interrupted", asstMsg?.status)
+        assertEquals("Content before disconnect.", asstMsg?.content)
+    }
 }
 
 class FakeConversationDao : ConversationDao {

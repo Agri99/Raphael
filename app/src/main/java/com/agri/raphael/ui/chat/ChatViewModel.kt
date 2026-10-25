@@ -229,10 +229,17 @@ class ChatViewModel(
         val convId = _currentConversationId.value ?: return
         if (_isGenerating.value) return
 
+        // Synchronously acquire generation lock on caller thread to prevent rapid-retry races
+        _isGenerating.value = true
+        _lastError.value = null
+
         viewModelScope.launch(ioDispatcher) {
             // Retrieve recent messages for this conversation (ordered newest first)
             val recent = repository.getRecentMessages(convId, limit = 5)
-            if (recent.isEmpty()) return@launch
+            if (recent.isEmpty()) {
+                _isGenerating.value = false
+                return@launch
+            }
 
             val newestMessage = recent.first()
 
@@ -250,7 +257,7 @@ class ChatViewModel(
                 // Case 3: The newest message is a completed assistant message.
                 // The latest turn is already complete. Do not delete older historical interrupted messages.
                 else -> {
-                    // No action needed for completed turns.
+                    _isGenerating.value = false
                 }
             }
         }
