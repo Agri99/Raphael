@@ -93,6 +93,10 @@ class ChatViewModel(
         if (trimmed.isEmpty()) return
         val convId = _currentConversationId.value ?: return
 
+        // Set generation active synchronously on caller thread to prevent rapid-send races
+        _isGenerating.value = true
+        _lastError.value = null
+
         val userMessageId = UUID.randomUUID().toString()
         val userMsg = MessageEntity(
             id = userMessageId,
@@ -209,32 +213,16 @@ class ChatViewModel(
 
     fun stopGeneration() {
         val reqId = activeRequestId
-        val convId = activeConversationId ?: _currentConversationId.value
-        val draftId = activeDraftId
         if (reqId != null) {
             inferenceBackend.cancelRequest(reqId)
         }
         activeCall?.cancel()
 
-        // Terminate channel to flush and write interrupted state bound to originating conversation
+        // Terminate channel to flush and write interrupted state bound to originating conversation.
+        // The serialized channel writer is the SOLE owner of draft content/status updates to eliminate racing writers.
         generationChannel?.trySend(GenerationEvent.Terminal(success = false, error = "Cancelled", wasDone = false))
         generationChannel?.close()
         generationChannel = null
-
-        if (convId != null && draftId != null) {
-            viewModelScope.launch(ioDispatcher) {
-                val currentMessages = repository.getRecentMessages(convId, limit = 10)
-                val target = currentMessages.find { it.id == draftId }
-                if (target != null && target.status == "streaming") {
-                    repository.updateMessage(target.copy(status = "interrupted"))
-                }
-            }
-        }
-        _isGenerating.value = false
-        activeCall = null
-        activeRequestId = null
-        activeDraftId = null
-        activeConversationId = null
     }
 
     fun retryLast() {
@@ -244,12 +232,27 @@ class ChatViewModel(
         viewModelScope.launch(ioDispatcher) {
             // Retrieve recent messages for this conversation (ordered newest first)
             val recent = repository.getRecentMessages(convId, limit = 5)
-            // Explicitly find the latest incomplete assistant message draft
-            val targetIncomplete = recent.firstOrNull { it.role == "assistant" && it.status != "complete" }
-            if (targetIncomplete != null) {
-                repository.deleteMessage(targetIncomplete.id)
+            if (recent.isEmpty()) return@launch
+
+            val newestMessage = recent.first()
+
+            when {
+                // Case 1: The newest message in the conversation is an incomplete assistant draft.
+                // It belongs to the latest turn. Delete it and retry generation for this turn.
+                newestMessage.role == "assistant" && newestMessage.status != "complete" -> {
+                    repository.deleteMessage(newestMessage.id)
+                    startAssistantGeneration(convId)
+                }
+                // Case 2: The newest message is a user message (assistant generation failed before completing).
+                newestMessage.role == "user" -> {
+                    startAssistantGeneration(convId)
+                }
+                // Case 3: The newest message is a completed assistant message.
+                // The latest turn is already complete. Do not delete older historical interrupted messages.
+                else -> {
+                    // No action needed for completed turns.
+                }
             }
-            startAssistantGeneration(convId)
         }
     }
 }

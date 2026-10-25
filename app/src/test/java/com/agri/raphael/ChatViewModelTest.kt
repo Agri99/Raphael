@@ -181,6 +181,76 @@ class ChatViewModelTest {
         assertEquals("Part 1: Hello. Part 2: Raphael. Part 3: Complete.", asstMsg?.content)
         assertEquals("complete", asstMsg?.status)
     }
+
+    @Test
+    fun testRapidRepeatedSendIgnored() = runTest {
+        val convId = "conv-rapid-send"
+        viewModel.selectConversation(convId)
+        fakeBackend.autoComplete = false
+
+        viewModel.sendUserMessage("First prompt")
+        // Rapid second call while first generation is initiating
+        viewModel.sendUserMessage("Second prompt")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val messages = fakeDao.getMessagesForConversation(convId).first()
+        val userMessages = messages.filter { it.role == "user" }
+        assertEquals(1, userMessages.size)
+        assertEquals("First prompt", userMessages[0].content)
+    }
+
+    @Test
+    fun testRetryDoesNotDeleteStaleInterruptedMessageAfterCompletedTurn() = runTest {
+        val convId = "conv-stale-retry"
+        viewModel.selectConversation(convId)
+
+        // Turn 1 (interrupted in history)
+        fakeDao.insertMessage(MessageEntity("u-1", convId, "user", "Q1", 1000L, "complete"))
+        fakeDao.insertMessage(MessageEntity("a-1", convId, "assistant", "Partial Q1", 2000L, "interrupted"))
+
+        // Turn 2 (completed successfully)
+        fakeDao.insertMessage(MessageEntity("u-2", convId, "user", "Q2", 3000L, "complete"))
+        fakeDao.insertMessage(MessageEntity("a-2", convId, "assistant", "Answer Q2", 4000L, "complete"))
+
+        // Invoke Retry
+        viewModel.retryLast()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verify old interrupted draft from Turn 1 is NOT deleted
+        val messages = fakeDao.getMessagesForConversation(convId).first()
+        assertTrue("Historical interrupted message must be preserved", messages.any { it.id == "a-1" })
+        assertTrue("Completed latest response must be preserved", messages.any { it.id == "a-2" })
+    }
+
+    @Test
+    fun testStopDuringStreamingPreservesAccumulatedText() = runTest {
+        val convId = "conv-stop-accumulated"
+        viewModel.selectConversation(convId)
+
+        fakeBackend.autoComplete = false
+        var emitDelta: ((StreamEvent) -> Unit)? = null
+
+        fakeBackend.onStreamChatStarted = { onEvent, _ ->
+            emitDelta = onEvent
+        }
+
+        viewModel.sendUserMessage("Start stream")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        emitDelta?.invoke(StreamEvent.Delta("Accumulated Part 1. "))
+        emitDelta?.invoke(StreamEvent.Delta("Accumulated Part 2."))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Call stop
+        viewModel.stopGeneration()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val messages = fakeDao.getMessagesForConversation(convId).first()
+        val asstDraft = messages.find { it.role == "assistant" }
+        assertTrue(asstDraft != null)
+        assertEquals("Accumulated Part 1. Accumulated Part 2.", asstDraft?.content)
+        assertEquals("interrupted", asstDraft?.status)
+    }
 }
 
 class FakeConversationDao : ConversationDao {

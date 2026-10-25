@@ -2,7 +2,7 @@
 
 Raphael is a native Android AI companion inspired by Raphael-sensei from "That Time I Got Reincarnated as a Slime". It operates as a personal satellite connected to laptop-local inference and shared durable memory via Alexandria.
 
-This repository implements Revision 3.2 FINAL of the Raphael Architecture Specification, encompassing:
+This repository implements Revision 3.4 (Lean Production Readiness) of the Raphael Architecture Specification, encompassing:
 1. Raphael Android Native Application (Kotlin, Jetpack Compose, Room, DataStore, Android Keystore).
 2. Restricted Mobile Gateway (FastAPI, Server-Sent Events, Ollama adapter, Concurrency scheduler).
 3. Alexandria Shared Memory Module (In-process SQLite provider, exact deduplication, idempotency).
