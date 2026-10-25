@@ -59,7 +59,7 @@ Generate a cryptographically secure 32-byte bearer token using the gateway CLI:
 python -m friday_mobile_gateway.cli rotate-token
 ```
 
-This updates `config.toml` automatically. Note the generated token securely for entry in the Raphael Android app settings.
+This generates a new secure bearer token and writes it to `config.local.toml` (which is excluded by `.gitignore`). Note the generated token securely for entry in the Raphael Android app settings.
 
 To inspect configuration status:
 

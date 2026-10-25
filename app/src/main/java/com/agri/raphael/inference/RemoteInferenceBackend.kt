@@ -94,76 +94,16 @@ class RemoteInferenceBackend(
                         return
                     }
 
-                    var currentEvent = "message"
-                    var receivedDone = false
-                    var receivedError: String? = null
+                    if (call.isCanceled()) {
+                        onComplete(false, "Cancelled", false)
+                        return
+                    }
 
-                    try {
-                        while (!source.exhausted()) {
-                            val line = source.readUtf8Line() ?: break
-                            val trimmed = line.trim()
-                            if (trimmed.isEmpty()) {
-                                currentEvent = "message"
-                                continue
-                            }
-
-                            if (trimmed.startsWith("event:")) {
-                                currentEvent = trimmed.removePrefix("event:").trim()
-                            } else if (trimmed.startsWith("data:")) {
-                                val payload = trimmed.removePrefix("data:").trim()
-                                try {
-                                    val dataObj = JSONObject(payload)
-                                    when (currentEvent) {
-                                        "meta" -> {
-                                            onEvent(
-                                                StreamEvent.Meta(
-                                                    requestId = dataObj.optString("request_id", ""),
-                                                    apiVersion = dataObj.optString("api_version", "v1")
-                                                )
-                                            )
-                                        }
-                                        "delta" -> {
-                                            val text = dataObj.optString("text", "")
-                                            if (text.isNotEmpty()) {
-                                                onEvent(StreamEvent.Delta(text))
-                                            }
-                                        }
-                                        "done" -> {
-                                            receivedDone = true
-                                            onEvent(
-                                                StreamEvent.Done(
-                                                    finishReason = dataObj.optString("finish_reason", "stop")
-                                                )
-                                            )
-                                        }
-                                        "error" -> {
-                                            val code = dataObj.optString("error_code", "INTERNAL_ERROR")
-                                            val msg = dataObj.optString("message", "Stream error")
-                                            receivedError = "$code: $msg"
-                                            onEvent(StreamEvent.Error(errorCode = code, message = msg))
-                                        }
-                                    }
-                                } catch (jsonEx: Exception) {
-                                    // Raw text fallback
-                                    if (currentEvent == "delta") {
-                                        onEvent(StreamEvent.Delta(payload))
-                                    }
-                                }
-                            }
-                        }
-
-                        if (receivedError != null) {
-                            onComplete(false, receivedError, false)
-                        } else if (!receivedDone) {
-                            onComplete(false, "Stream ended unexpectedly before terminal done event.", false)
-                        } else {
-                            onComplete(true, null, true)
-                        }
-                    } catch (ex: Exception) {
+                    parseSseStream(source, onEvent) { success, error, wasDone ->
                         if (call.isCanceled()) {
                             onComplete(false, "Cancelled", false)
                         } else {
-                            onComplete(false, ex.message ?: "Stream read failure", false)
+                            onComplete(success, error, wasDone)
                         }
                     }
                 }
@@ -186,5 +126,82 @@ class RemoteInferenceBackend(
                 response.close()
             }
         })
+    }
+
+    companion object {
+        fun parseSseStream(
+            source: BufferedSource,
+            onEvent: (StreamEvent) -> Unit,
+            onComplete: (Boolean, String?, Boolean) -> Unit
+        ) {
+            var currentEvent = "message"
+            var receivedDone = false
+            var receivedError: String? = null
+
+            try {
+                while (!source.exhausted()) {
+                    val line = source.readUtf8Line() ?: break
+                    val trimmed = line.trim()
+                    if (trimmed.isEmpty()) {
+                        currentEvent = "message"
+                        continue
+                    }
+
+                    if (trimmed.startsWith("event:")) {
+                        currentEvent = trimmed.removePrefix("event:").trim()
+                    } else if (trimmed.startsWith("data:")) {
+                        val payload = trimmed.removePrefix("data:").trim()
+                        try {
+                            val dataObj = JSONObject(payload)
+                            when (currentEvent) {
+                                "meta" -> {
+                                    onEvent(
+                                        StreamEvent.Meta(
+                                            requestId = dataObj.optString("request_id", ""),
+                                            apiVersion = dataObj.optString("api_version", "v1")
+                                        )
+                                    )
+                                }
+                                "delta" -> {
+                                    val text = dataObj.optString("text", "")
+                                    if (text.isNotEmpty()) {
+                                        onEvent(StreamEvent.Delta(text))
+                                    }
+                                }
+                                "done" -> {
+                                    receivedDone = true
+                                    onEvent(
+                                        StreamEvent.Done(
+                                            finishReason = dataObj.optString("finish_reason", "stop")
+                                        )
+                                    )
+                                }
+                                "error" -> {
+                                    val code = dataObj.optString("error_code", "INTERNAL_ERROR")
+                                    val msg = dataObj.optString("message", "Stream error")
+                                    receivedError = "$code: $msg"
+                                    onEvent(StreamEvent.Error(errorCode = code, message = msg))
+                                }
+                            }
+                        } catch (jsonEx: Exception) {
+                            // Raw text fallback
+                            if (currentEvent == "delta") {
+                                onEvent(StreamEvent.Delta(payload))
+                            }
+                        }
+                    }
+                }
+
+                if (receivedError != null) {
+                    onComplete(false, receivedError, false)
+                } else if (!receivedDone) {
+                    onComplete(false, "Stream ended unexpectedly before terminal done event.", false)
+                } else {
+                    onComplete(true, null, true)
+                }
+            } catch (ex: Exception) {
+                onComplete(false, ex.message ?: "Stream read failure", false)
+            }
+        }
     }
 }
