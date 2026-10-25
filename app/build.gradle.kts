@@ -21,6 +21,30 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("RAPHAEL_KEYSTORE_PATH")
+                ?: (project.findProperty("RAPHAEL_KEYSTORE_PATH") as? String)
+                ?: rootProject.file("keystore/release.jks").takeIf { it.exists() }?.absolutePath
+            val storePass = System.getenv("RAPHAEL_KEYSTORE_PASSWORD")
+                ?: (project.findProperty("RAPHAEL_KEYSTORE_PASSWORD") as? String)
+            val keyAliasName = System.getenv("RAPHAEL_KEY_ALIAS")
+                ?: (project.findProperty("RAPHAEL_KEY_ALIAS") as? String)
+            val keyPass = System.getenv("RAPHAEL_KEY_PASSWORD")
+                ?: (project.findProperty("RAPHAEL_KEY_PASSWORD") as? String)
+
+            if (!keystorePath.isNullOrBlank() && !storePass.isNullOrBlank() && !keyAliasName.isNullOrBlank() && !keyPass.isNullOrBlank()) {
+                val f = file(keystorePath)
+                if (f.exists()) {
+                    storeFile = f
+                    storePassword = storePass
+                    keyAlias = keyAliasName
+                    keyPassword = keyPass
+                }
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -28,6 +52,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            val releaseConfig = signingConfigs.getByName("release")
+            if (releaseConfig.storeFile != null) {
+                signingConfig = releaseConfig
+            }
         }
         debug {
             applicationIdSuffix = ".debug"

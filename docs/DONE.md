@@ -43,7 +43,9 @@ Date: 25 October 2026
 - [x] Serialized stream persistence: single Channel writer on ioDispatcher handles in-order deltas and idempotent terminal transitions.
 - [x] Stop generation and completion strictly bound to originating active conversation; eliminates racing secondary writers.
 - [x] Retry target selection restricted to latest incomplete turn without descending-order assumptions or deleting historical drafts.
-- [x] Synchronous send guard prevents duplicate requests under rapid repeated taps.
+- [x] Synchronous send and retry guards prevent duplicate requests and rapid repeated tap race conditions.
+- [x] Stop vs done terminal race and Stop vs network failure race covered by regression tests.
+- [x] Release signing configuration added to build.gradle.kts with secrets sourced outside Git; keystore generation, backup archive, and offline recovery drill verified.
 - [x] Fast and Deep (Extended Budget) mode toggle chips.
 - [x] Streaming chat UI with user/assistant bubbles, Stop generation, and Retry on interruption.
 - [x] Memory management UI: view approved memories, "Remember this" explicit create dialog, edit, delete, and undo.
@@ -54,7 +56,11 @@ Date: 25 October 2026
 ### Testing and CI Hygiene
 - [x] Gateway unit, parity, and protocol fixture tests passing in pytest (26/26 tests pass).
 - [x] Alexandria module, concurrency, migration, and backup tests passing in pytest (42/42 tests pass).
-- [x] Android unit tests for ChatViewModel and RemoteInferenceBackend passing (10/10 tests pass).
+- [x] Android unit tests for ChatViewModel and RemoteInferenceBackend passing (16/16 tests pass, including single-flight retry, rapid tap, and Stop race conditions).
 - [x] Authoritative Alexandria checkout and 100% SHA-256 bitwise parity verified in Gateway CI.
+- [x] Alexandria SQLite online backup and offline recovery drill verified: 10.67ms backup, 22.73ms restore, schema v2 integrity, and post-restore CRUD operations pass.
+- [x] Raphael release signing key drill verified: RSA 4096-bit PKCS12 key generation, backup archive creation, and offline key recovery drill pass.
+- [x] Fast vs. Deep empirical benchmark completed and recorded in docs/phase5_evaluation.md (5 fixed prompts, 10 synthetic memory prompts).
+- [x] GitHub Actions check runs verified green on exact commit SHAs (Alexandria run 40152666506 for 84649ff; Raphael runs 40152685705 and 40152685706 for f55a7e8).
 - [x] GitHub Actions workflows configured for supported Python versions (3.11, 3.12, 3.13).
 - [x] Version control .gitignore configured to exclude runtime databases, WAL files, keystores, and credentials.
