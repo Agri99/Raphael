@@ -13,6 +13,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -214,7 +215,11 @@ class FakeMessageDao : MessageDao {
         messages.value = messages.value.map { if (it.id == message.id) message else it }
     }
 
-    override fun getMessagesForConversation(conversationId: String): Flow<List<MessageEntity>> = messages
+    override fun getMessagesForConversation(conversationId: String): Flow<List<MessageEntity>> =
+        messages.map { list ->
+            list.filter { it.conversationId == conversationId }
+                .sortedBy { it.createdAtEpochMs }
+        }
 
     override suspend fun getRecentMessages(conversationId: String, limit: Int): List<MessageEntity> =
         messages.value.filter { it.conversationId == conversationId }
