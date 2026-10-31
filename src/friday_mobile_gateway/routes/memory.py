@@ -54,7 +54,7 @@ def _get_provider() -> MemoryProvider:
         from core.sqlite_provider import SqliteMemoryProvider
         db_path = Path(SETTINGS.storage.database_path)
         if not db_path.is_absolute():
-            db_path = Path(__file__).parent.parent.parent / db_path
+            db_path = Path(__file__).resolve().parent.parent.parent.parent / db_path
         db_path.parent.mkdir(parents=True, exist_ok=True)
         memory_provider = SqliteMemoryProvider(
             db_path=db_path,
