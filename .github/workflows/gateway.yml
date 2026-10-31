@@ -1,4 +1,4 @@
-name: Gateway CI
+name: K.A.R.E.N. Gateway CI
 
 on:
   push:
@@ -14,16 +14,16 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
 
     steps:
-      - name: Checkout Raphael
+      - name: Checkout K.A.R.E.N.
         uses: actions/checkout@v4
         with:
-          path: Raphael
+          path: K.A.R.E.N.
 
-      - name: Checkout authoritative Alexandria
+      - name: Checkout authoritative C.O.R.E.
         uses: actions/checkout@v4
         with:
-          repository: Agri99/Alexandria
-          path: Alexandria
+          repository: Agri99/C.O.R.E.
+          path: C.O.R.E.
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -31,12 +31,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        working-directory: Raphael
+        working-directory: K.A.R.E.N.
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-asyncio
 
       - name: Run Gateway and Cross-Repository Parity Tests
-        working-directory: Raphael
+        working-directory: K.A.R.E.N.
         run: pytest

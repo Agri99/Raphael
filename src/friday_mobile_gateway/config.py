@@ -29,7 +29,7 @@ class RoleConfig(BaseModel):
 
 
 class StorageConfig(BaseModel):
-    database_path: str = "data/alexandria.sqlite3"
+    database_path: str = "data/core.sqlite3"
     undo_window_seconds: int = 86400
 
 
@@ -41,7 +41,7 @@ class GatewaySettings(BaseModel):
         "deep": RoleConfig(provider="ollama", model="qwen2.5:3b", num_ctx=16384, num_predict=1536, thinking="off"),
     })
     storage: StorageConfig = Field(default_factory=StorageConfig)
-    persona_path: str = "config/personas/raphael-v1.md"
+    persona_path: str = "config/personas/karen-v1.md"
     max_request_body_bytes: int = 65536
     max_concurrent_generations: int = 1
     max_queue_size: int = 1

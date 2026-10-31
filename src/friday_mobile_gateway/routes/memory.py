@@ -1,4 +1,4 @@
-"""Memory API routes delegating directly to in-process Alexandria MemoryProvider."""
+"""Memory API routes delegating directly to in-process C.O.R.E. MemoryProvider."""
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -11,9 +11,9 @@ from ..schemas import (
     MemoryListResponse,
 )
 from ..observability import METRICS
-from alexandria.provider import MemoryProvider
-from alexandria.models import MemoryDraft, MemoryRecord
-from alexandria.lifecycle import (
+from core.provider import MemoryProvider
+from core.models import MemoryDraft, MemoryRecord
+from core.lifecycle import (
     InvalidMemoryError,
     RequestIdConflictError,
     MemoryNotFoundError,
@@ -51,7 +51,7 @@ def _get_provider() -> MemoryProvider:
     if memory_provider is None:
         from pathlib import Path
         from ..config import SETTINGS
-        from alexandria.sqlite_provider import SqliteMemoryProvider
+        from core.sqlite_provider import SqliteMemoryProvider
         db_path = Path(SETTINGS.storage.database_path)
         if not db_path.is_absolute():
             db_path = Path(__file__).parent.parent.parent / db_path

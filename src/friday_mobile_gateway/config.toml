@@ -1,4 +1,4 @@
-# Restricted Gateway configuration for Raphael
+# Restricted Gateway configuration for K.A.R.E.N.
 # Revision 3.4 (Lean Production Readiness)
 
 [server]
@@ -24,6 +24,6 @@ num_predict = 1536
 thinking = "off"
 
 [storage]
-database_path = "data/alexandria.sqlite3"
+database_path = "data/core.sqlite3"
 undo_window_seconds = 86400
 

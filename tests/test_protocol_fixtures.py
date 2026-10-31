@@ -19,9 +19,9 @@ def test_delta_sse_fixture():
 
     data = json.loads(lines[1][6:])
     assert "text" in data
-    assert data["text"] == "Hello from Raphael"
+    assert data["text"] == "Hello from K.A.R.E.N."
 
-    generated = format_sse("delta", {"text": "Hello from Raphael"}).strip()
+    generated = format_sse("delta", {"text": "Hello from K.A.R.E.N."}).strip()
     assert generated == content.strip()
 
 

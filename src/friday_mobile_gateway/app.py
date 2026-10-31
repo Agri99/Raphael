@@ -13,7 +13,7 @@ from .routes.info import router as info_router
 from .routes.chat import router as chat_router, configure_chat_dependencies, scheduler, ollama_adapter, context_builder
 from .routes.memory import router as memory_router, configure_memory_provider
 from .observability import METRICS, logger
-from alexandria.sqlite_provider import SqliteMemoryProvider
+from core.sqlite_provider import SqliteMemoryProvider
 
 
 @asynccontextmanager
@@ -26,14 +26,14 @@ async def lifespan(app: FastAPI):
             "or set GATEWAY_BEARER_TOKEN environment variable."
         )
 
-    # Startup: resolve DB path and initialize Alexandria provider (graceful fallback if DB fails)
+    # Startup: resolve DB path and initialize C.O.R.E. provider (graceful fallback if DB fails)
     db_path = Path(SETTINGS.storage.database_path)
     if not db_path.is_absolute():
         db_path = Path(__file__).parent.parent.parent / db_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        logger.info("Initializing Alexandria SQLite provider at %s", db_path)
+        logger.info("Initializing C.O.R.E. SQLite provider at %s", db_path)
         provider = SqliteMemoryProvider(
             db_path=db_path,
             undo_window_seconds=SETTINGS.storage.undo_window_seconds,
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
         context_builder.memory_provider = provider
     except Exception as exc:
         METRICS.record_error("MEMORY_UNAVAILABLE")
-        logger.warning("Alexandria initialization failed; gateway starting in degraded mode without memory: %s", exc)
+        logger.warning("C.O.R.E. initialization failed; gateway starting in degraded mode without memory: %s", exc)
         configure_memory_provider(None)
         context_builder.memory_provider = None
 
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Raphael Restricted Mobile Gateway",
+    title="K.A.R.E.N. Restricted Mobile Gateway",
     version="1.0.0",
     lifespan=lifespan,
     docs_url=None,

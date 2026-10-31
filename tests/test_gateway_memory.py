@@ -1,4 +1,4 @@
-"""Integration tests for gateway memory routes delegating to in-process Alexandria."""
+"""Integration tests for gateway memory routes delegating to in-process C.O.R.E."""
 
 import uuid
 import pytest

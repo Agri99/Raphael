@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Tailscale Serve launch script for Raphael Gateway
+# Tailscale Serve launch script for K.A.R.E.N. Gateway
 # Revision 3.4 (Lean Production Readiness)
 
 set -euo pipefail
 
-echo "Starting Raphael Gateway in background..."
+echo "Starting K.A.R.E.N. Gateway in background..."
 python -m uvicorn friday_mobile_gateway.app:app --host 127.0.0.1 --port 8765 &
 gateway_pid=$!
 

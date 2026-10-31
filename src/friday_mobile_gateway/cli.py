@@ -32,7 +32,7 @@ def rotate_token_cmd(args):
         tomlkit.dump(doc, f)
 
     print("Generated new bearer token and saved to uncommitted config.local.toml.")
-    print("New Bearer Token (record securely in Raphael Android settings, do not commit):")
+    print("New Bearer Token (record securely in K.A.R.E.N. Android settings, do not commit):")
     print(new_token)
 
 
@@ -47,7 +47,7 @@ def status_cmd(args):
 
 
 def restore_db_cmd(args):
-    from alexandria.backup import restore_sqlite_backup
+    from core.backup import restore_sqlite_backup
     backup_file = Path(args.backup_path).resolve()
     if not backup_file.exists():
         print(f"Error: Backup file not found at {backup_file}", file=sys.stderr)
@@ -69,7 +69,7 @@ def restore_db_cmd(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Raphael Restricted Gateway Operations CLI")
+    parser = argparse.ArgumentParser(description="K.A.R.E.N. Restricted Gateway Operations CLI")
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("rotate-token", help="Generate and set a new random 32-byte bearer token in config.local.toml")

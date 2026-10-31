@@ -1,22 +1,24 @@
-# Raphael: Android Satellite & Restricted Gateway
+# K.A.R.E.N.: Android Satellite & Restricted Gateway
 
-Raphael is a native Android AI companion inspired by Raphael-sensei from "That Time I Got Reincarnated as a Slime". It operates as a personal satellite connected to laptop-local inference and shared durable memory via Alexandria.
+K.A.R.E.N. (Knowledge Archive and Retrieval Entity Network) is a native Android AI companion and satellite connected to laptop-local inference and shared durable memory via C.O.R.E. (Central Operational Repository Engine).
 
-This repository implements Revision 3.4 (Lean Production Readiness) of the Raphael Architecture Specification, encompassing:
-1. Raphael Android Native Application (Kotlin, Jetpack Compose, Room, DataStore, Android Keystore).
+Even though written with periods as an acronym, K.A.R.E.N. is read and spoken normally as "Karen", F.R.I.D.A.Y. as "Friday", and C.O.R.E. as "Core".
+
+This repository implements Revision 3.4 (Lean Production Readiness) of the K.A.R.E.N. Architecture Specification, encompassing:
+1. K.A.R.E.N. Android Native Application (Kotlin, Jetpack Compose, Room, DataStore, Android Keystore).
 2. Restricted Mobile Gateway (FastAPI, Server-Sent Events, Ollama adapter, Concurrency scheduler).
-3. Alexandria Shared Memory Module (In-process SQLite provider, exact deduplication, idempotency).
+3. C.O.R.E. Shared Memory Module (In-process SQLite provider, exact deduplication, idempotency).
 
 ## Architecture Overview
 
 ```
-Xiaomi 12T (Raphael Android App)
+Xiaomi 12T (K.A.R.E.N. Android App)
 |-- UI (Jetpack Compose + ViewModels + Unidirectional State Flow)
 |-- Room DB: Private on-device chat history (Never uploaded to server)
 |-- DataStore: Non-secret connection settings
 |-- Android Keystore: Encrypted bearer token storage
 |-- RemoteInferenceBackend: SSE streaming client over OkHttp
-\-- AlexandriaClient: Explicit memory management UI only
+\-- CoreClient: Explicit memory management UI only
      |
      | Tailscale Private Tailnet (Encrypted HTTPS)
      v
@@ -26,7 +28,7 @@ Laptop Gateway (127.0.0.1:8765)
 |-- Role mapper: "fast" (qwen2.5:3b, 8k ctx) and "deep" (qwen2.5:3b, 16k extended budget) aliases
 |-- Normalized SSE streaming (meta, delta, done, error)
 |-- Concurrency scheduler (1 active slot, bounded queue, queue timeout)
-\-- Alexandria Provider (In-process SQLite module at data/alexandria.sqlite3)
+\-- C.O.R.E. Provider (In-process SQLite module at data/core.sqlite3)
      |
      v
 Local Inference Runtime (Ollama at 127.0.0.1:11434)
@@ -36,7 +38,7 @@ Local Inference Runtime (Ollama at 127.0.0.1:11434)
 
 - Private request path: The gateway binds exclusively to 127.0.0.1. Tailscale Serve provides authenticated, tailnet-only HTTPS proxying.
 - Single bearer token: One high-entropy token authenticates chat and memory routes.
-- Privacy boundary: Full conversation transcripts are stored solely on the Android phone in Room. Raw chat transcripts are never stored in Alexandria, sent to external services, or written to server logs.
+- Privacy boundary: Full conversation transcripts are stored solely on the Android phone in Room. Raw chat transcripts are never stored in C.O.R.E., sent to external services, or written to server logs.
 - Memory untrusted input: Stored memories are injected as reference facts, never as system instructions or permission grants.
 - Reasoning suppression: Internal model thinking tokens are filtered and never displayed as answer text.
 
@@ -59,7 +61,7 @@ Generate a cryptographically secure 32-byte bearer token using the gateway CLI:
 python -m friday_mobile_gateway.cli rotate-token
 ```
 
-This generates a new secure bearer token and writes it to `config.local.toml` (which is excluded by `.gitignore`). Note the generated token securely for entry in the Raphael Android app settings.
+This generates a new secure bearer token and writes it to `config.local.toml` (which is excluded by `.gitignore`). Note the generated token securely for entry in the K.A.R.E.N. Android app settings.
 
 To inspect configuration status:
 
@@ -92,7 +94,7 @@ Confirm that `tailscale serve status` displays your tailnet-only HTTPS endpoint 
 
 ### 4. Running Gateway Unit & Integration Tests
 
-Execute the automated test suite covering auth, budgeting, streaming, and Alexandria memory routes:
+Execute the automated test suite covering auth, budgeting, streaming, and C.O.R.E. memory routes:
 
 ```bash
 pytest
@@ -120,7 +122,7 @@ To assemble a debug APK:
 
 1. Install the debug APK on your Android device (e.g., Xiaomi 12T).
 2. Connect to the same Tailscale tailnet as the laptop.
-3. Open Raphael and navigate to Settings.
+3. Open K.A.R.E.N. and navigate to Settings.
 4. Enter the Tailscale Serve HTTPS URL (e.g., `https://laptop-name.tailnet.ts.net`) and paste your bearer token.
 5. Tap "Test Connection" to verify authenticated reachability.
 
@@ -128,11 +130,11 @@ To assemble a debug APK:
 
 ```
 ├── app/
-│   ├── src/main/java/com/agri/raphael/
+│   ├── src/main/java/com/agri/karen/
 │   │   ├── MainActivity.kt
 │   │   ├── data/                 # Room database, entities, DAOs, repository
 │   │   ├── inference/            # RemoteInferenceBackend SSE streaming client
-│   │   ├── memory/               # AlexandriaMemoryClient CRUD interface
+│   │   ├── memory/               # CoreMemoryClient CRUD interface
 │   │   ├── security/             # Keystore-backed TokenStore
 │   │   ├── settings/             # DataStore PreferencesStore
 │   │   └── ui/                   # Jetpack Compose screens (Chat, Conversations, Memories, Settings)
@@ -148,10 +150,10 @@ To assemble a debug APK:
 │   │   ├── scheduler.py          # Concurrency limiter and cancellation tracker
 │   │   ├── streaming.py          # Normalized Server-Sent Events generator
 │   │   └── routes/               # API routes (health, info, chat, memory)
-│   └── alexandria/               # In-process shared memory provider module
+│   └── core/                     # In-process shared memory provider module
 ├── config/
 │   └── personas/
-│       └── raphael-v1.md         # Server-owned Raphael persona definition
+│       └── karen-v1.md           # Server-owned K.A.R.E.N. persona definition
 ├── docs/
 │   ├── DONE.md                   # Full acceptance checklist and verification report
 │   └── phase5_evaluation.md      # 10-prompt memory evaluation benchmark

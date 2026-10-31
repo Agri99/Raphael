@@ -1,4 +1,4 @@
-"""Release Signing Key Generation, Verification, Backup, and Recovery Tool for Raphael.
+"""Release Signing Key Generation, Verification, Backup, and Recovery Tool for K.A.R.E.N.
 
 This utility manages the release signing key lifecycle:
 1. Generates PKCS12 release keystore (RSA 4096-bit, SHA256withRSA, 10,000 days validity).
@@ -20,11 +20,15 @@ import zipfile
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 KEYSTORE_DIR = REPO_ROOT / "keystore"
-KEYSTORE_FILE = KEYSTORE_DIR / "raphael_release.jks"
+KEYSTORE_FILE = KEYSTORE_DIR / "karen_release.jks"
+# Legacy fallback
+if not KEYSTORE_FILE.exists() and (KEYSTORE_DIR / "raphael_release.jks").exists():
+    KEYSTORE_FILE = KEYSTORE_DIR / "raphael_release.jks"
+
 BACKUP_DIR = KEYSTORE_DIR / "backup"
 CREDENTIALS_FILE = KEYSTORE_DIR / "release_credentials.local"
-ALIAS = "raphael_release"
-DNAME = "CN=Raphael Personal AI, OU=Production, O=Agri, C=ID"
+ALIAS = "karen_release" if "karen" in KEYSTORE_FILE.name else "raphael_release"
+DNAME = "CN=K.A.R.E.N. Personal AI, OU=Production, O=Agri, C=ID"
 VALIDITY_DAYS = 10000
 
 
@@ -122,10 +126,10 @@ def inspect_keystore(keytool: str, keystore_path: Path, password: str) -> dict:
 def backup_keystore(password: str) -> Path:
     """Create a backup archive of the keystore and metadata."""
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    backup_zip = BACKUP_DIR / "raphael_release_key_backup.zip"
+    backup_zip = BACKUP_DIR / "karen_release_key_backup.zip"
     
     with zipfile.ZipFile(backup_zip, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.write(KEYSTORE_FILE, arcname="raphael_release.jks")
+        zf.write(KEYSTORE_FILE, arcname=KEYSTORE_FILE.name)
         zf.writestr(
             "RECOVERY_METADATA.txt",
             f"Alias: {ALIAS}\nDName: {DNAME}\nValidityDays: {VALIDITY_DAYS}\n"
@@ -139,16 +143,16 @@ def run_recovery_drill(keytool: str, backup_zip: Path, password: str) -> bool:
     print("\n=== RUNNING KEY RECOVERY DRILL ===")
     drill_dir = KEYSTORE_DIR / "drill_recovery"
     drill_dir.mkdir(parents=True, exist_ok=True)
-    recovered_keystore = drill_dir / "recovered_release.jks"
+    recovered_keystore = drill_dir / f"recovered_{KEYSTORE_FILE.name}"
 
     if recovered_keystore.exists():
         recovered_keystore.unlink()
 
     # Restore from backup archive
     with zipfile.ZipFile(backup_zip, "r") as zf:
-        zf.extract("raphael_release.jks", drill_dir)
+        zf.extract(KEYSTORE_FILE.name, drill_dir)
     
-    shutil.move(drill_dir / "raphael_release.jks", recovered_keystore)
+    shutil.move(drill_dir / KEYSTORE_FILE.name, recovered_keystore)
     print(f"Extracted keystore from backup to: {recovered_keystore}")
 
     # Inspect recovered keystore

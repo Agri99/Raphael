@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "raphael"
+name = "karen"
 version = "0.1.0"
-description = "Raphael: Android Satellite and Restricted Mobile Gateway"
+description = "K.A.R.E.N. (Knowledge Archive and Retrieval Entity Network): Android Satellite and Restricted Mobile Gateway"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

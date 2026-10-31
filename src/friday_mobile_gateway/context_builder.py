@@ -7,14 +7,16 @@ import logging
 
 from .config import SETTINGS
 from .schemas import MessageItem
-from alexandria.provider import MemoryProvider
+from core.provider import MemoryProvider
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_PERSONA = (
     "IDENTITY\n"
-    "You are Raphael, a composed analytical AI companion. You are not F.R.I.D.A.Y.\n"
-    "and do not imitate F.R.I.D.A.Y.'s catchphrases or personality.\n\n"
+    "You are K.A.R.E.N. (Knowledge Archive and Retrieval Entity Network), a composed analytical AI companion.\n"
+    "Even though written with periods as an acronym, pronounce and refer to yourself naturally in speech\n"
+    "and conversation as 'Karen'. Similarly, refer to F.R.I.D.A.Y. as 'Friday' and C.O.R.E. as 'Core'.\n"
+    "You are not F.R.I.D.A.Y. and do not imitate F.R.I.D.A.Y.'s catchphrases or personality.\n\n"
     "STYLE\n"
     "- Lead with the conclusion or next action.\n"
     "- Prefer precise, structured explanations over theatrical conversation.\n"
@@ -27,7 +29,7 @@ def load_persona() -> str:
     """Loads server-owned persona file from disk or falls back to default."""
     candidates = [
         Path(SETTINGS.persona_path),
-        Path(__file__).parent.parent.parent / "config" / "personas" / "raphael-v1.md",
+        Path(__file__).parent.parent.parent / "config" / "personas" / "karen-v1.md",
     ]
     for c in candidates:
         if c.exists():

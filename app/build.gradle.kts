@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.agri.raphael"
+    namespace = "com.agri.karen"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.agri.raphael"
+        applicationId = "com.agri.karen"
         minSdk = 28
         targetSdk = 34
         versionCode = 1
@@ -23,14 +23,23 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystorePath = System.getenv("RAPHAEL_KEYSTORE_PATH")
+            val keystorePath = System.getenv("KAREN_KEYSTORE_PATH")
+                ?: System.getenv("RAPHAEL_KEYSTORE_PATH")
+                ?: (project.findProperty("KAREN_KEYSTORE_PATH") as? String)
                 ?: (project.findProperty("RAPHAEL_KEYSTORE_PATH") as? String)
+                ?: rootProject.file("keystore/karen_release.jks").takeIf { it.exists() }?.absolutePath
                 ?: rootProject.file("keystore/release.jks").takeIf { it.exists() }?.absolutePath
-            val storePass = System.getenv("RAPHAEL_KEYSTORE_PASSWORD")
+            val storePass = System.getenv("KAREN_KEYSTORE_PASSWORD")
+                ?: System.getenv("RAPHAEL_KEYSTORE_PASSWORD")
+                ?: (project.findProperty("KAREN_KEYSTORE_PASSWORD") as? String)
                 ?: (project.findProperty("RAPHAEL_KEYSTORE_PASSWORD") as? String)
-            val keyAliasName = System.getenv("RAPHAEL_KEY_ALIAS")
+            val keyAliasName = System.getenv("KAREN_KEY_ALIAS")
+                ?: System.getenv("RAPHAEL_KEY_ALIAS")
+                ?: (project.findProperty("KAREN_KEY_ALIAS") as? String)
                 ?: (project.findProperty("RAPHAEL_KEY_ALIAS") as? String)
-            val keyPass = System.getenv("RAPHAEL_KEY_PASSWORD")
+            val keyPass = System.getenv("KAREN_KEY_PASSWORD")
+                ?: System.getenv("RAPHAEL_KEY_PASSWORD")
+                ?: (project.findProperty("KAREN_KEY_PASSWORD") as? String)
                 ?: (project.findProperty("RAPHAEL_KEY_PASSWORD") as? String)
 
             if (!keystorePath.isNullOrBlank() && !storePass.isNullOrBlank() && !keyAliasName.isNullOrBlank() && !keyPass.isNullOrBlank()) {

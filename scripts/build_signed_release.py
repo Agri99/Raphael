@@ -1,4 +1,4 @@
-"""Build and verify signed release APK for Raphael."""
+"""Build and verify signed release APK for K.A.R.E.N."""
 
 import os
 from pathlib import Path
@@ -7,7 +7,10 @@ import sys
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-KEYSTORE_FILE = REPO_ROOT / "keystore" / "raphael_release.jks"
+KEYSTORE_FILE = REPO_ROOT / "keystore" / "karen_release.jks"
+if not KEYSTORE_FILE.exists() and (REPO_ROOT / "keystore" / "raphael_release.jks").exists():
+    KEYSTORE_FILE = REPO_ROOT / "keystore" / "raphael_release.jks"
+
 CREDENTIALS_FILE = REPO_ROOT / "keystore" / "release_credentials.local"
 
 
@@ -26,11 +29,18 @@ def build_signed_release():
     password = CREDENTIALS_FILE.read_text(encoding="utf-8").strip()
     java_home = find_java_home()
 
+    alias = "karen_release" if "karen" in KEYSTORE_FILE.name else "raphael_release"
+
     env = os.environ.copy()
     env["JAVA_HOME"] = java_home
+    env["KAREN_KEYSTORE_PATH"] = str(KEYSTORE_FILE)
+    env["KAREN_KEYSTORE_PASSWORD"] = password
+    env["KAREN_KEY_ALIAS"] = alias
+    env["KAREN_KEY_PASSWORD"] = password
+    # Fallback envs
     env["RAPHAEL_KEYSTORE_PATH"] = str(KEYSTORE_FILE)
     env["RAPHAEL_KEYSTORE_PASSWORD"] = password
-    env["RAPHAEL_KEY_ALIAS"] = "raphael_release"
+    env["RAPHAEL_KEY_ALIAS"] = alias
     env["RAPHAEL_KEY_PASSWORD"] = password
 
     gradlew = str(REPO_ROOT / "gradlew.bat") if os.name == "nt" else str(REPO_ROOT / "gradlew")

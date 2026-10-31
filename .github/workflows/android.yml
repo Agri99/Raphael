@@ -1,4 +1,4 @@
-name: Android CI
+name: K.A.R.E.N. Android CI
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build and Test Android App
+    name: Build and Test K.A.R.E.N. Android App
     runs-on: ubuntu-latest
 
     steps:
@@ -34,5 +34,5 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: raphael-debug-apk
+          name: karen-debug-apk
           path: app/build/outputs/apk/debug/
